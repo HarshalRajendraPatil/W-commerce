@@ -12,7 +12,6 @@ const OrderReview = ({ checkoutData, onBack }) => {
   const { user } = useSelector(state => state.auth);
   
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState(null); // 'success', 'failed', or null
   const [orderId, setOrderId] = useState(null);
   
   // Load Razorpay script
@@ -42,18 +41,6 @@ const OrderReview = ({ checkoutData, onBack }) => {
     };
   }, []);
   
-  // Redirect to order success page after successful payment
-  useEffect(() => {
-    if (paymentStatus === 'success' && orderId) {
-      // Short delay to show success message before redirecting
-      const timer = setTimeout(() => {
-        navigate(`/order-success/${orderId}`);
-      }, 2000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [paymentStatus, orderId, navigate]);
-  
   const handlePlaceOrder = async () => {
     if (!cart || cart.items.length === 0) {
       toast.error('Your cart is empty');
@@ -66,7 +53,6 @@ const OrderReview = ({ checkoutData, onBack }) => {
     }
     
     setIsProcessing(true);
-    setPaymentStatus(null);
     
     try {
       // Calculate values
@@ -126,10 +112,14 @@ const OrderReview = ({ checkoutData, onBack }) => {
             
             await dispatch(processPayment(paymentData)).unwrap();
             dispatch(clearCart());
-            setPaymentStatus('success');
+            
+            // Show success message
             toast.success('Payment successful! Your order has been placed.');
+            
+            // Immediately redirect to order success page
+            navigate(`/order-success/${newOrderId}`);
           } catch (error) {
-            setPaymentStatus('failed');
+            console.error("Payment verification failed:", error);
             toast.error('Payment verification failed. Please contact support.');
             setIsProcessing(false);
           }
@@ -152,69 +142,18 @@ const OrderReview = ({ checkoutData, onBack }) => {
       
       const razorpay = new window.Razorpay(options);
       razorpay.on('payment.failed', function(response) {
-        setPaymentStatus('failed');
+        console.error("Payment failed:", response);
         toast.error(`Payment failed: ${response.error.description}`);
         setIsProcessing(false);
       });
       
       razorpay.open();
     } catch (error) {
-      setPaymentStatus('failed');
+      console.error("Order creation error:", error);
       toast.error(error.message || 'Failed to place order. Please try again.');
       setIsProcessing(false);
     }
   };
-  
-  // If payment was successful, show success message
-  if (paymentStatus === 'success') {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-8 text-center">
-        <div className="flex justify-center mb-4">
-          <div className="rounded-full bg-green-100 p-3">
-            <svg className="h-12 w-12 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Payment Successful!</h2>
-        <p className="text-gray-600 mb-6">Your order has been placed successfully. Redirecting to order details...</p>
-        <div className="animate-pulse flex justify-center">
-          <div className="h-2 w-24 bg-indigo-200 rounded"></div>
-        </div>
-      </div>
-    );
-  }
-  
-  // If payment failed, show error message with retry option
-  if (paymentStatus === 'failed') {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-8 text-center">
-        <div className="flex justify-center mb-4">
-          <div className="rounded-full bg-red-100 p-3">
-            <svg className="h-12 w-12 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Payment Failed</h2>
-        <p className="text-gray-600 mb-6">We couldn't process your payment. Please try again.</p>
-        <div className="flex justify-center space-x-4">
-          <button
-            onClick={() => setPaymentStatus(null)}
-            className="text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            Go Back
-          </button>
-          <button
-            onClick={handlePlaceOrder}
-            className="bg-indigo-600 text-white py-2 px-6 rounded-md hover:bg-indigo-700 transition-colors"
-          >
-            Retry Payment
-          </button>
-        </div>
-      </div>
-    );
-  }
   
   return (
     <div className="bg-white rounded-lg shadow-md p-6">

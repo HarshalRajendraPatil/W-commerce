@@ -47,7 +47,6 @@ const CheckoutPage = () => {
   // Redirect to cart if empty
   useEffect(() => {
     if (!cartLoading && cart && (!cart.items || cart.items.length === 0)) {
-      toast.info('Your cart is empty');
       navigate('/cart');
     }
   }, [cart, cartLoading, navigate]);

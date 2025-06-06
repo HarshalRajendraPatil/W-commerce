@@ -105,7 +105,6 @@ const cartSlice = createSlice({
       .addCase(addToCart.fulfilled, (state, action) => {
         state.loading = false;
         state.cart = action.payload;
-        // toast.success('Item added to cart');
       })
       .addCase(addToCart.rejected, (state, action) => {
         state.loading = false;
@@ -148,7 +147,6 @@ const cartSlice = createSlice({
       .addCase(clearCart.fulfilled, (state, action) => {
         state.loading = false;
         state.cart = action.payload;
-        toast.success('Cart cleared');
       })
       .addCase(clearCart.rejected, (state, action) => {
         state.loading = false;
