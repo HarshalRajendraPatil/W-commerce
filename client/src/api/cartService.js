@@ -56,6 +56,26 @@ const cartService = {
     } catch (error) {
       throw error;
     }
+  },
+
+  // Apply coupon to cart
+  applyCoupon: async (code) => {
+    try {
+      const response = await axios.post('/coupons/apply', { code });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Remove coupon from cart
+  removeCoupon: async () => {
+    try {
+      const response = await axios.delete('/coupons/remove');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 };
 

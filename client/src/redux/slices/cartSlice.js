@@ -70,6 +70,34 @@ export const clearCart = createAsyncThunk(
   }
 );
 
+export const applyCoupon = createAsyncThunk(
+  'cart/applyCoupon',
+  async (code, { rejectWithValue }) => {
+    try {
+      const response = await cartService.applyCoupon(code);
+      toast.success(response.message || 'Coupon applied successfully');
+      return response.data;
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to apply coupon');
+      return rejectWithValue(error.response?.data?.message || 'Failed to apply coupon');
+    }
+  }
+);
+
+export const removeCoupon = createAsyncThunk(
+  'cart/removeCoupon',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await cartService.removeCoupon();
+      toast.success(response.message || 'Coupon removed successfully');
+      return response.data;
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to remove coupon');
+      return rejectWithValue(error.response?.data?.message || 'Failed to remove coupon');
+    }
+  }
+);
+
 // Create slice
 const cartSlice = createSlice({
   name: 'cart',
@@ -149,6 +177,34 @@ const cartSlice = createSlice({
         state.cart = action.payload;
       })
       .addCase(clearCart.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      
+      // Apply coupon
+      .addCase(applyCoupon.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(applyCoupon.fulfilled, (state, action) => {
+        state.loading = false;
+        state.cart = action.payload;
+      })
+      .addCase(applyCoupon.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      
+      // Remove coupon
+      .addCase(removeCoupon.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(removeCoupon.fulfilled, (state, action) => {
+        state.loading = false;
+        state.cart = action.payload;
+      })
+      .addCase(removeCoupon.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

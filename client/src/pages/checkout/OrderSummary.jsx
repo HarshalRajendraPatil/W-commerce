@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import CouponForm from '../../components/CouponForm';
 
 const OrderSummary = ({ cart, showCheckoutButton = true }) => {
   // Calculate values
@@ -17,6 +18,9 @@ const OrderSummary = ({ cart, showCheckoutButton = true }) => {
           <span className="text-gray-600">Subtotal ({cart?.totalItems || 0} items)</span>
           <span className="font-medium">${subtotal.toFixed(2)}</span>
         </div>
+        
+        {/* Coupon Form */}
+        {showCheckoutButton && <CouponForm />}
         
         {discount > 0 && (
           <div className="flex justify-between text-green-600">

@@ -1,165 +1,153 @@
-# W-Commerce Backend
+# W-Commerce API Server
 
-A fully-featured REST API for an e-commerce platform built with Node.js, Express, and MongoDB.
+A robust e-commerce backend API built with Node.js, Express, and MongoDB.
 
 ## Features
 
-### 🔐 Authentication & User Management
-- User registration and login with JWT authentication
-- Email verification
-- Password reset functionality
-- User roles (customer, admin, vendor)
-- User profile management
-- Address management
+- **User Authentication**: Register, login, password reset
+- **Product Management**: CRUD operations for products with image uploads
+- **Category Management**: Organize products into categories
+- **Cart Management**: Add, update, remove items from cart
+- **Coupon System**: Create and apply discount coupons
+- **Order Processing**: Place orders, track order status
+- **Reviews & Ratings**: Product review system
+- **Wishlist**: Save products for later
+- **Admin Dashboard**: Manage products, orders, users
 
-### 🛒 Product Management
-- Product listing with pagination, filtering, and search
-- Product categories and subcategories
-- Product variants (size, color, etc.)
-- Product reviews and ratings
-- Inventory management
+## Tech Stack
 
-### 🧺 Shopping Experience
-- Shopping cart functionality
-- Wishlist management
-- Product comparison
+- **Node.js**: JavaScript runtime
+- **Express**: Web framework
+- **MongoDB**: NoSQL database
+- **Mongoose**: MongoDB object modeling
+- **JWT**: Authentication
+- **Express-fileupload**: File upload handling
 
-### 💳 Checkout & Payments
-- Order creation and management
-- Payment processing (Stripe integration)
-- Coupon system
+## Prerequisites
 
-### 📊 Admin Dashboard Endpoints
-- User management
-- Product/category management
-- Order management
-- Analytics endpoints
+- Node.js (v14 or higher)
+- MongoDB (local or Atlas)
+- npm or yarn
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v14+)
-- MongoDB
-
-### Installation
+## Installation
 
 1. Clone the repository
-   ```
-   git clone https://github.com/yourusername/w-commerce.git
-   cd w-commerce
-   ```
+```bash
+git clone https://your-repository-url.git
+cd w-commerce/server
+```
 
 2. Install dependencies
-   ```
-   npm install
-   ```
+```bash
+npm install
+```
 
-3. Set up environment variables
-   - Create a `.env` file in the root directory
-   - Add the following variables:
-   ```
-   PORT=5000
-   MONGO_URI=your_mongodb_connection_string
-   JWT_SECRET=your_jwt_secret
-   JWT_EXPIRES_IN=30d
-   
-   # Email configuration
-   EMAIL_SERVICE=gmail
-   EMAIL_USER=your_email@gmail.com
-   EMAIL_PASSWORD=your_email_password
-   
-   # Stripe configuration
-   STRIPE_SECRET_KEY=your_stripe_secret_key
-   STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
-   ```
+3. Create a `.env` file in the server directory with the following variables:
+```
+NODE_ENV=development
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRE=30d
+CLIENT_URL=http://localhost:3000
+```
 
-4. Start the development server
-   ```
-   npm run dev
-   ```
+4. Start the server
+```bash
+# Development mode
+npm run dev
 
-## API Documentation
+# Production mode
+npm start
+```
 
-### Auth Routes
+## API Endpoints
+
+### Authentication
 - `POST /api/auth/register` - Register a new user
-- `POST /api/auth/login` - Login a user
-- `GET /api/auth/logout` - Logout a user
+- `POST /api/auth/login` - Login
+- `POST /api/auth/logout` - Logout
 - `GET /api/auth/me` - Get current user
-- `POST /api/auth/forgot-password` - Send password reset email
-- `PUT /api/auth/reset-password/:token` - Reset password
-- `PUT /api/auth/update-password` - Update password
-- `GET /api/auth/verify-email/:token` - Verify email
 
-### User Routes
+### Users
 - `GET /api/users` - Get all users (admin)
-- `GET /api/users/:id` - Get user by ID (admin)
-- `PUT /api/users/:id` - Update user (admin)
-- `DELETE /api/users/:id` - Delete user (admin)
-- `GET /api/users/profile` - Get user profile
-- `PUT /api/users/profile` - Update profile
-- `POST /api/users/addresses` - Add address
-- `PUT /api/users/addresses/:addressId` - Update address
-- `DELETE /api/users/addresses/:addressId` - Delete address
-- `PUT /api/users/addresses/:addressId/default` - Set default address
+- `GET /api/users/:id` - Get user by ID
+- `PUT /api/users/:id` - Update user
+- `DELETE /api/users/:id` - Delete user
 
-### Product Routes
+### Products
 - `GET /api/products` - Get all products
 - `GET /api/products/:id` - Get product by ID
-- `POST /api/products` - Create product (vendor/admin)
-- `PUT /api/products/:id` - Update product (vendor/admin)
-- `DELETE /api/products/:id` - Delete product (vendor/admin)
-- `GET /api/products/featured` - Get featured products
-- `GET /api/products/top-rated` - Get top rated products
-- `GET /api/products/search` - Search products
-- `GET /api/products/category/:categoryId` - Get products by category
-- `GET /api/products/:id/reviews` - Get product reviews
-- `GET /api/products/:id/related` - Get related products
+- `POST /api/products` - Create product (admin)
+- `PUT /api/products/:id` - Update product (admin)
+- `DELETE /api/products/:id` - Delete product (admin)
 
-### Category Routes
+### Categories
 - `GET /api/categories` - Get all categories
 - `GET /api/categories/:id` - Get category by ID
 - `POST /api/categories` - Create category (admin)
 - `PUT /api/categories/:id` - Update category (admin)
 - `DELETE /api/categories/:id` - Delete category (admin)
-- `GET /api/categories/:id/subcategories` - Get subcategories
 
-### Cart Routes
-- `GET /api/cart` - Get cart
-- `POST /api/cart/add` - Add to cart
-- `PUT /api/cart/items/:itemId` - Update cart item
+### Cart
+- `GET /api/cart` - Get user's cart
+- `POST /api/cart` - Add to cart
+- `PUT /api/cart/items` - Update cart item
 - `DELETE /api/cart/items/:itemId` - Remove from cart
-- `DELETE /api/cart/clear` - Clear cart
-- `POST /api/cart/apply-coupon` - Apply coupon
+- `DELETE /api/cart` - Clear cart
 
-### Order Routes
-- `POST /api/orders` - Create order
-- `GET /api/orders` - Get all orders (admin/vendor)
+### Coupons
+- `GET /api/coupons` - Get all coupons (admin)
+- `POST /api/coupons` - Create coupon (admin)
+- `GET /api/coupons/:id` - Get coupon by ID (admin)
+- `PUT /api/coupons/:id` - Update coupon (admin)
+- `DELETE /api/coupons/:id` - Delete coupon (admin)
+- `POST /api/coupons/apply` - Apply coupon to cart
+- `DELETE /api/coupons/remove` - Remove coupon from cart
+
+### Orders
+- `GET /api/orders` - Get all orders (admin)
+- `GET /api/orders/my` - Get user's orders
 - `GET /api/orders/:id` - Get order by ID
-- `PUT /api/orders/:id/status` - Update order status (admin/vendor)
-- `POST /api/orders/:id/cancel` - Cancel order
-- `GET /api/orders/my-orders` - Get user orders
-- `POST /api/orders/payment` - Process payment
-- `GET /api/orders/:id/payment-status` - Get payment status
-- `POST /api/orders/create-checkout-session` - Create checkout session
+- `POST /api/orders` - Create order
+- `PUT /api/orders/:id` - Update order status (admin)
 
-### Review Routes
+### Reviews
 - `GET /api/reviews` - Get all reviews
 - `GET /api/reviews/:id` - Get review by ID
 - `POST /api/reviews` - Create review
 - `PUT /api/reviews/:id` - Update review
 - `DELETE /api/reviews/:id` - Delete review
-- `PUT /api/reviews/:id/approve` - Approve review (admin)
-- `PUT /api/reviews/:id/reject` - Reject review (admin)
-- `POST /api/reviews/:id/like` - Like review
 
-### Wishlist Routes
-- `GET /api/wishlist` - Get wishlist
-- `POST /api/wishlist/add/:productId` - Add to wishlist
-- `DELETE /api/wishlist/remove/:productId` - Remove from wishlist
-- `DELETE /api/wishlist/clear` - Clear wishlist
-- `GET /api/wishlist/:id` - Get wishlist by ID (public wishlist)
+### Wishlist
+- `GET /api/wishlist` - Get user's wishlist
+- `POST /api/wishlist` - Add to wishlist
+- `DELETE /api/wishlist/:productId` - Remove from wishlist
+
+## Error Handling
+
+The API has consistent error handling with appropriate HTTP status codes and error messages.
+
+## Security
+
+- JWT based authentication
+- Password hashing
+- Route protection middleware
+- Role-based access control
+
+## Models
+
+The database consists of the following models:
+
+- User
+- Product
+- Category
+- Cart
+- Order
+- Review
+- Wishlist
+- Coupon
 
 ## License
 
-This project is licensed under the MIT License 
+MIT 

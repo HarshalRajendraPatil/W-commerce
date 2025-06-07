@@ -45,6 +45,7 @@ app.use('/api/orders', require('./routes/order.routes'));
 app.use('/api/reviews', require('./routes/review.routes'));
 app.use('/api/wishlist', require('./routes/wishlist.routes'));
 app.use('/api/uploads', require('./routes/upload.routes'));
+app.use('/api/coupons', require('./routes/coupon.routes'));
 
 // Root route
 app.get('/', (req, res) => {
