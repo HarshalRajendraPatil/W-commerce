@@ -9,6 +9,8 @@ import { getWishlist } from './redux/slices/wishlistSlice';
 
 // Layout components
 import MainLayout from './layouts/MainLayout';
+import AdminLayout from './layouts/AdminLayout';
+import VendorLayout from './components/vendor/VendorLayout';
 
 // Page components
 import Login from './pages/auth/Login';
@@ -31,6 +33,20 @@ import TrackOrder from './pages/orders/TrackOrder';
 import AboutPage from './pages/about/AboutPage';
 import ContactPage from './pages/contact/ContactPage';
 import CheckoutPage from './pages/checkout/CheckoutPage';
+import Profile from './pages/profile/Profile';
+
+// Admin Pages
+import AdminDashboard from './pages/admin/Dashboard';
+import Products from './pages/admin/Products';
+import Categories from './pages/admin/Categories';
+import Orders from './pages/admin/Orders';
+import Customers from './pages/admin/Customers';
+import Coupons from './pages/admin/Coupons';
+import Reviews from './pages/admin/Reviews';
+import VendorApplications from './pages/admin/VendorApplications';
+
+// Vendor Pages
+import VendorDashboard from './pages/vendor/Dashboard';
 
 console.log(import.meta.env.VITE_RAZORPAY_KEY_ID);
 
@@ -107,7 +123,7 @@ function App() {
               path="profile" 
               element={
                 <ProtectedRoute>
-                  <div>Profile page (to be implemented)</div>
+                  <Profile />
                 </ProtectedRoute>
               } 
             />
@@ -168,22 +184,22 @@ function App() {
             
             <Route path="orders/track/:trackingNumber" element={<TrackOrder />} />
             
-            {/* Admin routes */}
+            {/* Admin routes - redirects to admin layout */}
             <Route 
-              path="admin/dashboard" 
+              path="admin/*" 
               element={
                 <AdminRoute>
-                  <div>Admin Dashboard (to be implemented)</div>
+                  <Navigate to="/admin/dashboard" replace />
                 </AdminRoute>
               } 
             />
             
-            {/* Vendor routes */}
+            {/* Vendor routes - redirects to vendor layout */}
             <Route 
-              path="vendor/products" 
+              path="vendor/*" 
               element={
                 <VendorRoute>
-                  <div>Vendor Products (to be implemented)</div>
+                  <Navigate to="/vendor/dashboard" replace />
                 </VendorRoute>
               } 
             />
@@ -198,6 +214,33 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/verify-email/:token" element={<VerifyEmail />} />
+          
+          {/* Admin Dashboard Layout */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="products" element={<Products />} />
+            <Route path="categories" element={<Categories />} />
+            <Route path="orders" element={<Orders />} />
+            <Route path="customers" element={<Customers />} />
+            <Route path="coupons" element={<Coupons />} />
+            <Route path="reviews" element={<Reviews />} />
+            <Route path="vendor-applications" element={<VendorApplications />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+          
+          {/* Vendor Dashboard Layout */}
+          <Route path="/vendor" element={<VendorLayout />}>
+            <Route path="dashboard" element={<VendorDashboard />} />
+            <Route path="products" element={<div>Vendor Products (to be implemented)</div>} />
+            <Route path="products/edit/:id" element={<div>Edit Product (to be implemented)</div>} />
+            <Route path="products/restock/:id" element={<div>Restock Product (to be implemented)</div>} />
+            <Route path="orders" element={<div>Vendor Orders (to be implemented)</div>} />
+            <Route path="orders/:id" element={<div>Order Details (to be implemented)</div>} />
+            <Route path="reviews" element={<div>Product Reviews (to be implemented)</div>} />
+            <Route path="analytics" element={<div>Analytics (to be implemented)</div>} />
+            <Route path="settings" element={<div>Settings (to be implemented)</div>} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
         </Routes>
       </div>
     </Router>
