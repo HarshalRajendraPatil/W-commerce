@@ -5,21 +5,21 @@ import VendorSidebar from './VendorSidebar';
 import { toast } from 'react-toastify';
 
 const VendorLayout = () => {
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
   const navigate = useNavigate();
 
   // Check if user is a vendor
   useEffect(() => {
-    if (!user) {
+    if (!isAuthenticated || !user) {
       navigate('/login');
       toast.error('You need to be logged in to access the vendor dashboard');
-    } else if (user.role !== 'vendor') {
+    } else if (user.role !== 'vendor' && user.role !== 'admin') {
       navigate('/');
       toast.error('You do not have permission to access the vendor dashboard');
     }
-  }, [user, navigate]);
+  }, [isAuthenticated, user, navigate]);
 
-  if (!user || user.role !== 'vendor') {
+  if (!isAuthenticated || !user || (user.role !== 'vendor' && user.role !== 'admin')) {
     return null; // Don't render anything until redirect happens
   }
 

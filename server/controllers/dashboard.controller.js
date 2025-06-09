@@ -691,4 +691,265 @@ exports.getVendorRecentReviews = async (req, res) => {
       message: 'Server error'
     });
   }
+};
+
+/**
+ * @desc    Get vendor analytics data
+ * @route   GET /api/dashboard/vendor/analytics
+ * @access  Private/Vendor
+ */
+exports.getVendorAnalytics = async (req, res) => {
+  try {
+    const vendorId = req.user.id;
+    
+    // Get time frame from query (defaults to 30 days)
+    const timeFrame = req.query.timeFrame || '30days';
+    let startDate = new Date();
+    
+    switch (timeFrame) {
+      case '7days':
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case '30days':
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case '90days':
+        startDate.setDate(startDate.getDate() - 90);
+        break;
+      case '1year':
+        startDate.setFullYear(startDate.getFullYear() - 1);
+        break;
+      default:
+        startDate.setDate(startDate.getDate() - 30);
+    }
+    
+    // Get all products from this vendor
+    const vendorProducts = await Product.find({ seller: vendorId }, '_id');
+    const productIds = vendorProducts.map(product => product._id);
+    
+    if (productIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          sales: {
+            data: [],
+            total: 0,
+            growth: 0
+          },
+          orders: {
+            data: [],
+            total: 0,
+            growth: 0
+          },
+          products: {
+            total: 0,
+            published: 0,
+            outOfStock: 0
+          },
+          topProducts: [],
+          revenueByCategory: []
+        }
+      });
+    }
+    
+    // Get orders containing vendor's products within the time frame
+    const orders = await Order.find({
+      'items.product': { $in: productIds },
+      createdAt: { $gte: startDate },
+      status: { $ne: 'cancelled' }
+    }).sort('createdAt');
+    
+    // Calculate revenue and order counts for each day
+    const salesByDay = {};
+    const productSales = {};
+    const categorySales = {};
+    let totalRevenue = 0;
+    let totalOrders = 0;
+    
+    // Keep track of processed order IDs to avoid counting the same order twice
+    const processedOrderIds = new Set();
+    
+    for (const order of orders) {
+      const date = new Date(order.createdAt).toISOString().split('T')[0];
+      
+      if (!salesByDay[date]) {
+        salesByDay[date] = {
+          revenue: 0,
+          orders: 0
+        };
+      }
+      
+      let orderRevenueForVendor = 0;
+      let orderContainsVendorProduct = false;
+      
+      // Only count items from this vendor
+      for (const item of order.items) {
+        if (productIds.some(id => id.equals(item.product))) {
+          orderContainsVendorProduct = true;
+          orderRevenueForVendor += item.price * item.quantity;
+          
+          // Track sales by product
+          const productId = item.product.toString();
+          if (!productSales[productId]) {
+            productSales[productId] = {
+              revenue: 0,
+              quantity: 0,
+              name: item.name,
+              image: item.image
+            };
+          }
+          
+          productSales[productId].revenue += item.price * item.quantity;
+          productSales[productId].quantity += item.quantity;
+          
+          // If we have category info, track sales by category
+          const product = await Product.findById(item.product).populate('category', 'name');
+          if (product && product.category) {
+            const categoryId = product.category._id.toString();
+            const categoryName = product.category.name;
+            
+            if (!categorySales[categoryId]) {
+              categorySales[categoryId] = {
+                revenue: 0,
+                orders: 0,
+                name: categoryName
+              };
+            }
+            
+            categorySales[categoryId].revenue += item.price * item.quantity;
+          }
+        }
+      }
+      
+      if (orderContainsVendorProduct) {
+        salesByDay[date].revenue += orderRevenueForVendor;
+        totalRevenue += orderRevenueForVendor;
+        
+        if (!processedOrderIds.has(order._id.toString())) {
+          salesByDay[date].orders += 1;
+          totalOrders += 1;
+          processedOrderIds.add(order._id.toString());
+          
+          // Increment category order count (only once per order)
+          for (const item of order.items) {
+            if (productIds.some(id => id.equals(item.product))) {
+              const product = await Product.findById(item.product).populate('category', 'name');
+              if (product && product.category) {
+                const categoryId = product.category._id.toString();
+                categorySales[categoryId].orders += 1;
+                break; // Only count the category once per order
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Calculate growth by comparing to previous period
+    const calculateGrowth = async (currentPeriodStart, metricType) => {
+      const previousPeriodStart = new Date(currentPeriodStart);
+      const timeDiff = new Date() - currentPeriodStart;
+      previousPeriodStart.setTime(previousPeriodStart.getTime() - timeDiff);
+      
+      const previousPeriodOrders = await Order.find({
+        'items.product': { $in: productIds },
+        createdAt: { $gte: previousPeriodStart, $lt: currentPeriodStart },
+        status: { $ne: 'cancelled' }
+      });
+      
+      let previousPeriodRevenue = 0;
+      let previousPeriodOrderCount = 0;
+      const processedIds = new Set();
+      
+      for (const order of previousPeriodOrders) {
+        let orderRevenueForVendor = 0;
+        let containsVendorProduct = false;
+        
+        for (const item of order.items) {
+          if (productIds.some(id => id.equals(item.product))) {
+            containsVendorProduct = true;
+            orderRevenueForVendor += item.price * item.quantity;
+          }
+        }
+        
+        if (containsVendorProduct) {
+          previousPeriodRevenue += orderRevenueForVendor;
+          
+          if (!processedIds.has(order._id.toString())) {
+            previousPeriodOrderCount += 1;
+            processedIds.add(order._id.toString());
+          }
+        }
+      }
+      
+      if (metricType === 'revenue') {
+        return previousPeriodRevenue === 0
+          ? 100 // If previous period had 0 revenue, consider it 100% growth
+          : parseFloat((((totalRevenue - previousPeriodRevenue) / previousPeriodRevenue) * 100).toFixed(2));
+      } else {
+        return previousPeriodOrderCount === 0
+          ? 100 // If previous period had 0 orders, consider it 100% growth
+          : parseFloat((((totalOrders - previousPeriodOrderCount) / previousPeriodOrderCount) * 100).toFixed(2));
+      }
+    };
+    
+    const revenueGrowth = await calculateGrowth(startDate, 'revenue');
+    const orderGrowth = await calculateGrowth(startDate, 'orders');
+    
+    // Format sales data for charts
+    const salesData = Object.keys(salesByDay).map(date => ({
+      date,
+      revenue: salesByDay[date].revenue,
+      orders: salesByDay[date].orders
+    }));
+    
+    // Get top selling products
+    const topProducts = Object.keys(productSales)
+      .map(id => ({
+        id,
+        ...productSales[id]
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+    
+    // Format category sales data
+    const revenueByCategory = Object.keys(categorySales)
+      .map(id => ({
+        id,
+        ...categorySales[id]
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+    
+    // Get product stats
+    const productStats = {
+      total: await Product.countDocuments({ seller: vendorId }),
+      published: await Product.countDocuments({ seller: vendorId, published: true }),
+      outOfStock: await Product.countDocuments({ seller: vendorId, stockCount: 0 })
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        sales: {
+          data: salesData,
+          total: totalRevenue,
+          growth: revenueGrowth
+        },
+        orders: {
+          data: salesData,
+          total: totalOrders,
+          growth: orderGrowth
+        },
+        products: productStats,
+        topProducts,
+        revenueByCategory
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching vendor analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
 }; 

@@ -17,5 +17,6 @@ router.get('/vendor/top-products', protect, authorize('vendor'), dashboardContro
 router.get('/vendor/recent-orders', protect, authorize('vendor'), dashboardController.getVendorRecentOrders);
 router.get('/vendor/low-stock', protect, authorize('vendor'), dashboardController.getVendorLowStockProducts);
 router.get('/vendor/recent-reviews', protect, authorize('vendor'), dashboardController.getVendorRecentReviews);
+router.get('/vendor/analytics', protect, authorize('vendor'), dashboardController.getVendorAnalytics);
 
 module.exports = router; 

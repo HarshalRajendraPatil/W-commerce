@@ -650,4 +650,197 @@ exports.getReviewAnalyticsOverview = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+/**
+ * @desc    Get reviews for vendor's products
+ * @route   GET /api/reviews/vendor
+ * @access  Private/Vendor
+ */
+exports.getVendorProductReviews = async (req, res) => {
+  try {
+    // Get page and limit parameters for pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const startIndex = (page - 1) * limit;
+    
+    // Get all products from this vendor
+    const vendorProducts = await Product.find({ seller: req.user.id }, '_id');
+    const productIds = vendorProducts.map(product => product._id);
+    
+    if (productIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        pagination: {
+          current: page,
+          total: 0,
+          count: 0
+        },
+        data: []
+      });
+    }
+    
+    // Build filter
+    const filter = {
+      product: { $in: productIds }
+    };
+    
+    // Add rating filter if provided
+    if (req.query.rating) {
+      filter.rating = parseInt(req.query.rating, 10);
+    }
+    
+    // Add approval status filter if provided
+    if (req.query.isApproved === 'true') {
+      filter.isApproved = true;
+      filter.isRejected = false;
+    } else if (req.query.isApproved === 'false') {
+      filter.isApproved = false;
+    }
+    
+    // Execute query
+    const reviews = await Review.find(filter)
+      .populate({
+        path: 'user',
+        select: 'name avatar'
+      })
+      .populate({
+        path: 'product',
+        select: 'name images slug'
+      })
+      .sort(req.query.sort || '-createdAt')
+      .skip(startIndex)
+      .limit(limit);
+    
+    // Get total count
+    const total = await Review.countDocuments(filter);
+    
+    // Get rating statistics for vendor's products
+    const ratingStats = await Review.aggregate([
+      { $match: { product: { $in: productIds } } },
+      { 
+        $group: {
+          _id: '$rating',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: -1 } }
+    ]);
+    
+    // Format rating stats for easier frontend consumption
+    const formattedRatingStats = {};
+    let totalReviews = 0;
+    
+    ratingStats.forEach(stat => {
+      formattedRatingStats[stat._id] = stat.count;
+      totalReviews += stat.count;
+    });
+    
+    // Calculate percentages
+    for (let i = 5; i >= 1; i--) {
+      if (!formattedRatingStats[i]) {
+        formattedRatingStats[i] = 0;
+      }
+      formattedRatingStats[`${i}_percent`] = totalReviews > 0
+        ? Math.round((formattedRatingStats[i] / totalReviews) * 100)
+        : 0;
+    }
+    
+    // Calculate average rating
+    const averageRating = totalReviews > 0
+      ? parseFloat((Object.keys(formattedRatingStats)
+          .filter(key => !key.includes('_percent'))
+          .reduce((sum, key) => sum + (parseInt(key) * formattedRatingStats[key]), 0) / totalReviews)
+          .toFixed(1))
+      : 0;
+    
+    // Pagination result
+    const pagination = {
+      current: page,
+      total: Math.ceil(total / limit),
+      count: total
+    };
+    
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      pagination,
+      ratingStats: {
+        ...formattedRatingStats,
+        total: totalReviews,
+        average: averageRating
+      },
+      data: reviews
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: err.message
+    });
+  }
+};
+
+/**
+ * @desc    Respond to a review
+ * @route   POST /api/reviews/:id/respond
+ * @access  Private/Vendor
+ */
+exports.respondToReview = async (req, res) => {
+  try {
+    const { response } = req.body;
+    
+    if (!response) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a response'
+      });
+    }
+    
+    const review = await Review.findById(req.params.id);
+    
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: 'Review not found'
+      });
+    }
+    
+    // Check if the review is for a product sold by this vendor
+    const product = await Product.findById(review.product);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    if (product.seller.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to respond to this review'
+      });
+    }
+    
+    // Add vendor response
+    review.vendorResponse = {
+      text: response,
+      createdAt: Date.now()
+    };
+    
+    await review.save();
+    
+    res.status(200).json({
+      success: true,
+      data: review
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: err.message
+    });
+  }
 }; 

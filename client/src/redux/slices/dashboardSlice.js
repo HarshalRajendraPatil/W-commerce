@@ -14,7 +14,8 @@ const initialState = {
   isLoading: false,
   isSuccess: false,
   isError: false,
-  message: ''
+  message: '',
+  analyticsData: null
 };
 
 // Admin: Get dashboard statistics
@@ -188,6 +189,22 @@ export const getVendorRecentReviews = createAsyncThunk(
         error.response?.data?.message || 
         error.message || 
         'Failed to fetch recent reviews';
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Vendor: Get analytics data
+export const getVendorAnalytics = createAsyncThunk(
+  'dashboard/getVendorAnalytics',
+  async (timeFrame, thunkAPI) => {
+    try {
+      return await dashboardService.getVendorAnalytics(timeFrame);
+    } catch (error) {
+      const message = 
+        error.response?.data?.message || 
+        error.message || 
+        'Failed to fetch analytics data';
       return thunkAPI.rejectWithValue(message);
     }
   }
@@ -367,6 +384,21 @@ const dashboardSlice = createSlice({
         state.recentReviews = action.payload;
       })
       .addCase(getVendorRecentReviews.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      
+      // Vendor: Get analytics data
+      .addCase(getVendorAnalytics.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(getVendorAnalytics.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.analyticsData = action.payload;
+      })
+      .addCase(getVendorAnalytics.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;

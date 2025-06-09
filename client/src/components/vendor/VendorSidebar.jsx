@@ -29,7 +29,18 @@ const VendorSidebar = () => {
           <path d="M4 12L12 16L20 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M4 17L12 21L20 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-      )
+      ),
+      subItems: [
+        {
+          title: 'Add New Product',
+          path: '/vendor/products/new',
+          icon: (
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 4v16m8-8H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )
+        }
+      ]
     },
     {
       title: 'Orders',
@@ -111,6 +122,26 @@ const VendorSidebar = () => {
                   </div>
                   {!isCollapsed && <span className="ml-3">{item.title}</span>}
                 </Link>
+                
+                {/* Render sub-items if they exist and sidebar is not collapsed */}
+                {!isCollapsed && item.subItems && (
+                  <ul className="ml-6 mt-1 space-y-1">
+                    {item.subItems.map((subItem) => (
+                      <li key={subItem.path}>
+                        <Link
+                          to={subItem.path}
+                          className={`flex items-center p-2 text-sm rounded-md hover:bg-indigo-50 hover:text-indigo-600 transition-colors
+                            ${location.pathname === subItem.path ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600'}`}
+                        >
+                          <div className="flex items-center justify-center">
+                            {subItem.icon}
+                          </div>
+                          <span className="ml-3">{subItem.title}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>

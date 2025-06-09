@@ -10,13 +10,16 @@ const {
   rejectReview,
   likeReview,
   getProductReviewAnalytics,
-  getReviewAnalyticsOverview
+  getReviewAnalyticsOverview,
+  getVendorProductReviews,
+  respondToReview
 } = require('../controllers/review.controller');
 
 const router = express.Router();
 
 // Public routes
 router.get('/',  getReviews);
+router.get('/vendor', protect, authorize('vendor'), getVendorProductReviews);
 router.get('/:id', getReview);
 
 // Customer routes
@@ -24,6 +27,9 @@ router.post('/', protect, createReview);
 router.put('/:id', protect, updateReview);
 router.delete('/:id', protect, deleteReview);
 router.post('/:id/like', protect, likeReview);
+
+// Vendor routes
+router.post('/:id/respond', protect, authorize('vendor'), respondToReview);
 
 // Admin routes
 router.put('/:id/approve', protect, authorize('admin'), approveReview);

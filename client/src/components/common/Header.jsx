@@ -85,8 +85,8 @@ const Header = () => {
                     {user?.role === 'admin' && (
                       <Link to="/admin/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Admin Dashboard</Link>
                     )}
-                    {(user?.role === 'admin' || user?.role === 'vendor') && (
-                      <Link to="/vendor/products" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">My Products</Link>
+                    {(user?.role === 'vendor') && (
+                      <Link to="/vendor/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Vendor Dashboard</Link>
                     )}
                     <button 
                       onClick={handleLogout}
@@ -159,8 +159,8 @@ const Header = () => {
                   {user?.role === 'admin' && (
                     <Link to="/admin/dashboard" className="text-gray-700 hover:text-indigo-600">Admin Dashboard</Link>
                   )}
-                  {(user?.role === 'admin' || user?.role === 'vendor') && (
-                    <Link to="/vendor/products" className="text-gray-700 hover:text-indigo-600">My Products</Link>
+                  {(user?.role === 'vendor') && (
+                    <Link to="/vendor/dashboard" className="text-gray-700 hover:text-indigo-600">Vendor Dashboard</Link>
                   )}
                   <button 
                     onClick={handleLogout}

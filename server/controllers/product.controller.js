@@ -3,6 +3,9 @@ const Category = require('../models/Category');
 const Review = require('../models/Review');
 const mongoose = require('mongoose');
 const { ObjectId } = mongoose.Types;
+const cloudinary = require('../utils/cloudinary');
+
+
 
 /**
  * @desc    Get all products with pagination, filtering, and sorting
@@ -114,6 +117,88 @@ exports.getProducts = async (req, res, next) => {
 };
 
 /**
+ * @desc    Get all products for a vendor
+ * @route   GET /api/products/vendor
+ * @access  Private (Vendor)
+ */
+exports.getVendorProducts = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const startIndex = (page - 1) * limit;
+    const sort = req.query.sort || '-createdAt'; // Default sort by newest
+    
+    // Build query - only get products from the authenticated vendor
+    const queryObj = { seller: req.user.id };
+
+    // Filter by status if provided
+    if (req.query.published !== undefined) {
+      queryObj.published = req.query.published === 'true';
+    }
+    
+    // Filter by category
+    if (req.query.category && mongoose.isValidObjectId(req.query.category)) {
+      queryObj.category = req.query.category;
+    }
+    
+    // Filter by stock status
+    if (req.query.stockStatus) {
+      if (req.query.stockStatus === 'low') {
+        queryObj.stockCount = { $lt: 10, $gt: 0 };
+      } else if (req.query.stockStatus === 'out') {
+        queryObj.stockCount = 0;
+      } else if (req.query.stockStatus === 'in') {
+        queryObj.stockCount = { $gt: 0 };
+      }
+    }
+    
+    // Search by name or SKU
+    if (req.query.search) {
+      queryObj.$or = [
+        { name: { $regex: req.query.search, $options: 'i' } },
+        { sku: { $regex: req.query.search, $options: 'i' } }
+      ];
+    }
+    
+    // Execute query
+    const products = await Product.find(queryObj)
+      .sort(sort)
+      .skip(startIndex)
+      .limit(limit)
+      .populate({ path: 'category', select: 'name slug' });
+    
+    // Get total count
+    const total = await Product.countDocuments(queryObj);
+    
+    // Get counts for different statuses (for UI filters)
+    const statusCounts = {
+      total: await Product.countDocuments({ seller: req.user.id }),
+      published: await Product.countDocuments({ seller: req.user.id, published: true }),
+      draft: await Product.countDocuments({ seller: req.user.id, published: false }),
+      lowStock: await Product.countDocuments({ seller: req.user.id, stockCount: { $lt: 10, $gt: 0 } }),
+      outOfStock: await Product.countDocuments({ seller: req.user.id, stockCount: 0 })
+    };
+    
+    // Pagination result
+    const pagination = {
+      current: page,
+      total: Math.ceil(total / limit),
+      count: total
+    };
+    
+    res.status(200).json({
+      success: true,
+      pagination,
+      count: products.length,
+      statusCounts,
+      data: products
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * @desc    Get single product by ID or slug
  * @route   GET /api/products/:id
  * @access  Public
@@ -157,6 +242,41 @@ exports.createProduct = async (req, res, next) => {
     // Add seller ID from authenticated user
     req.body.seller = req.user.id;
     
+    // Parse JSON strings for specifications, tags, and variants if they exist
+    if (req.body.specifications && typeof req.body.specifications === 'string') {
+      try {
+        req.body.specifications = JSON.parse(req.body.specifications);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid specifications format'
+        });
+      }
+    }
+    
+    if (req.body.tags && typeof req.body.tags === 'string') {
+      try {
+        req.body.tags = JSON.parse(req.body.tags);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid tags format'
+        });
+      }
+    }
+    
+    // Parse variants data
+    if (req.body.variants && typeof req.body.variants === 'string') {
+      try {
+        req.body.variants = JSON.parse(req.body.variants);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid variants format'
+        });
+      }
+    }
+    
     // Validate category
     if (req.body.category) {
       const category = await Category.findById(req.body.category);
@@ -168,6 +288,52 @@ exports.createProduct = async (req, res, next) => {
       }
     }
     
+    // Handle image uploads if provided
+    const images = [];
+    if (req.files && req.files.images) {
+      const files = Array.isArray(req.files.images) ? req.files.images : [req.files.images];
+      
+      // Validate file types and sizes
+      for (const file of files) {
+        if (!file.mimetype.startsWith('image')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Please upload image files only'
+          });
+        }
+        
+        if (file.size > 2 * 1024 * 1024) {
+          return res.status(400).json({
+            success: false,
+            message: 'Image size should be less than 2MB'
+          });
+        }
+      }
+      
+      // Process and upload each image
+      const primaryIndex = req.body.primaryImageIndex ? parseInt(req.body.primaryImageIndex) : 0;
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const result = await cloudinary.uploadToCloudinary(file.tempFilePath, 'products');
+        
+        // Get alt text for this image if provided
+        const altText = req.body[`imageAlt_${i}`] || req.body.name || 'Product image';
+        
+        images.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+          alt: altText,
+          isPrimary: i === primaryIndex
+        });
+      }
+    }
+    
+    // Add images to request body
+    if (images.length > 0) {
+      req.body.images = images;
+    }
+
     // Create the product
     const product = await Product.create(req.body);
     
@@ -176,6 +342,7 @@ exports.createProduct = async (req, res, next) => {
       data: product
     });
   } catch (err) {
+    console.error('Product creation error:', err);
     next(err);
   }
 };
@@ -220,6 +387,104 @@ exports.updateProduct = async (req, res, next) => {
       req.params.id, 
       req.body, 
       { new: true, runValidators: true }
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: product
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Update product stock
+ * @route   PATCH /api/products/:id/stock
+ * @access  Private (Admin/Vendor)
+ */
+exports.updateProductStock = async (req, res, next) => {
+  try {
+    const { stockCount } = req.body;
+
+    if (stockCount === undefined || stockCount < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid stock count'
+      });
+    }
+
+    let product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    // Check ownership (only admin or the seller can update)
+    if (req.user.role !== 'admin' && product.seller.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this product'
+      });
+    }
+    
+    // Update the product stock
+    product = await Product.findByIdAndUpdate(
+      req.params.id, 
+      { stockCount }, 
+      { new: true }
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: product
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Update product status (published/unpublished)
+ * @route   PATCH /api/products/:id/status
+ * @access  Private (Admin/Vendor)
+ */
+exports.updateProductStatus = async (req, res, next) => {
+  try {
+    const { published } = req.body;
+
+    if (published === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide published status'
+      });
+    }
+
+    let product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    // Check ownership (only admin or the seller can update)
+    if (req.user.role !== 'admin' && product.seller.toString() !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update this product'
+      });
+    }
+    
+    // Update the product status
+    product = await Product.findByIdAndUpdate(
+      req.params.id, 
+      { published }, 
+      { new: true }
     );
     
     res.status(200).json({

@@ -88,10 +88,14 @@ const productService = {
   // Create a new product (Admin/Vendor only)
   createProduct: async (productData) => {
     try {
-      const response = await axios.post('/products', productData);
+      const response = await axios.post('/products', productData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
       return response.data;
     } catch (error) {
-      throw error;
+      throw error.response?.data || { message: 'Failed to create product' };
     }
   },
 

@@ -8,6 +8,10 @@ import dashboardReducer from './slices/dashboardSlice';
 import productReducer from './slices/productSlice';
 import categoryReducer from './slices/categorySlice';
 import vendorApplicationReducer from './slices/vendorApplicationSlice';
+import vendorProductsReducer from './slices/vendorProductsSlice';
+import vendorOrdersReducer from './slices/vendorOrdersSlice';
+import vendorReviewsReducer from './slices/vendorReviewsSlice';
+import vendorAnalyticsReducer from './slices/vendorAnalyticsSlice';
 
 // Configure the Redux store
 const store = configureStore({
@@ -20,7 +24,11 @@ const store = configureStore({
     dashboard: dashboardReducer,
     product: productReducer,
     category: categoryReducer,
-    vendorApplication: vendorApplicationReducer
+    vendorApplication: vendorApplicationReducer,
+    vendorProducts: vendorProductsReducer,
+    vendorOrders: vendorOrdersReducer,
+    vendorReviews: vendorReviewsReducer,
+    vendorAnalytics: vendorAnalyticsReducer
   },
   devTools: import.meta.env.MODE !== 'production'
 });

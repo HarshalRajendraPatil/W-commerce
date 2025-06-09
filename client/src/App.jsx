@@ -47,8 +47,12 @@ import VendorApplications from './pages/admin/VendorApplications';
 
 // Vendor Pages
 import VendorDashboard from './pages/vendor/Dashboard';
-
-console.log(import.meta.env.VITE_RAZORPAY_KEY_ID);
+import VendorProducts from './pages/vendor/Products';
+import VendorOrders from './pages/vendor/Orders';
+import VendorOrderDetails from './pages/vendor/OrderDetails';
+import VendorReviews from './pages/vendor/Reviews';
+import VendorAnalytics from './pages/vendor/Analytics';
+import AddProduct from './pages/vendor/AddProduct';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -231,13 +235,13 @@ function App() {
           {/* Vendor Dashboard Layout */}
           <Route path="/vendor" element={<VendorLayout />}>
             <Route path="dashboard" element={<VendorDashboard />} />
-            <Route path="products" element={<div>Vendor Products (to be implemented)</div>} />
+            <Route path="products" element={<VendorProducts />} />
+            <Route path="products/new" element={<AddProduct />} />
             <Route path="products/edit/:id" element={<div>Edit Product (to be implemented)</div>} />
-            <Route path="products/restock/:id" element={<div>Restock Product (to be implemented)</div>} />
-            <Route path="orders" element={<div>Vendor Orders (to be implemented)</div>} />
-            <Route path="orders/:id" element={<div>Order Details (to be implemented)</div>} />
-            <Route path="reviews" element={<div>Product Reviews (to be implemented)</div>} />
-            <Route path="analytics" element={<div>Analytics (to be implemented)</div>} />
+            <Route path="orders" element={<VendorOrders />} />
+            <Route path="orders/:id" element={<VendorOrderDetails />} />
+            <Route path="reviews" element={<VendorReviews />} />
+            <Route path="analytics" element={<VendorAnalytics />} />
             <Route path="settings" element={<div>Settings (to be implemented)</div>} />
             <Route path="*" element={<NotFound />} />
           </Route>

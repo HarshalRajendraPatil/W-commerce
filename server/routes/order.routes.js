@@ -11,7 +11,10 @@ const {
   getPaymentStatus,
   createRazorpayOrder,
   getOrderAnalytics,
-  trackOrder
+  trackOrder,
+  getVendorOrders,
+  getVendorOrderDetails,
+  updateOrderItemFulfillment
 } = require('../controllers/order.controller');
 
 const router = express.Router();
@@ -25,12 +28,17 @@ router.use(protect);
 router.post('/', createOrder);
 router.get('/my-orders', getOrdersByUser);
 router.get('/analytics', authorize('admin'), getOrderAnalytics);
+router.get('/vendor', authorize('vendor'), getVendorOrders);
 router.get('/:id', getOrder);
 router.get('/:id/payment-status', getPaymentStatus);
 router.post('/payment', processPayment);
 router.post('/create-razorpay-order', createRazorpayOrder);
 router.post('/:id/cancel', cancelOrder);
 router.get('/track/:trackingNumber', trackOrder);
+
+// Vendor routes
+router.get('/vendor/:id', authorize('vendor'), getVendorOrderDetails);
+router.patch('/:id/fulfill', authorize('vendor'), updateOrderItemFulfillment);
 
 // Admin routes
 router.get('/', authorize('admin', 'vendor'), getOrders);

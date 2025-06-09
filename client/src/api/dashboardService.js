@@ -109,6 +109,16 @@ const dashboardService = {
     } catch (error) {
       throw error;
     }
+  },
+
+  // Vendor: Get vendor analytics data
+  getVendorAnalytics: async (timeFrame = '30days') => {
+    try {
+      const response = await axios.get(`/dashboard/vendor/analytics?timeFrame=${timeFrame}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   }
 };
 

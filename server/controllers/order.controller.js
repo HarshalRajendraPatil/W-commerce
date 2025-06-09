@@ -906,4 +906,273 @@ exports.getOrderAnalytics = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+/**
+ * @desc    Get vendor orders (orders containing products from the vendor)
+ * @route   GET /api/orders/vendor
+ * @access  Private/Vendor
+ */
+exports.getVendorOrders = async (req, res, next) => {
+  try {
+    // Get pagination parameters
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const startIndex = (page - 1) * limit;
+    
+    // Get all products from this vendor
+    const vendorProducts = await Product.find({ seller: req.user.id }, '_id');
+    const productIds = vendorProducts.map(product => product._id);
+    
+    if (productIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        pagination: {
+          current: page,
+          total: 0,
+          count: 0
+        },
+        data: []
+      });
+    }
+    
+    // Build filter - only include orders that contain this vendor's products
+    const filter = {
+      'items.product': { $in: productIds }
+    };
+    
+    // Apply additional filters if provided
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
+    
+    if (req.query.startDate && req.query.endDate) {
+      filter.createdAt = {
+        $gte: new Date(req.query.startDate),
+        $lte: new Date(req.query.endDate)
+      };
+    }
+    
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      filter.$or = [
+        { trackingNumber: searchRegex },
+        { 'shippingAddress.name': searchRegex },
+        { 'shippingAddress.email': searchRegex }
+      ];
+    }
+    
+    // Find orders containing this vendor's products
+    const orders = await Order.find(filter)
+      .populate({
+        path: 'user',
+        select: 'name email'
+      })
+      .sort(req.query.sort || '-createdAt')
+      .skip(startIndex)
+      .limit(limit);
+    
+    // Count total matching orders
+    const total = await Order.countDocuments(filter);
+    
+    // Modify orders to only include this vendor's items and calculate vendor's revenue
+    const modifiedOrders = orders.map(order => {
+      const orderObj = order.toObject();
+      
+      // Filter items to only include this vendor's products
+      orderObj.items = orderObj.items.filter(item => 
+        productIds.some(id => id.toString() === item.product.toString())
+      );
+      
+      // Calculate vendor's subtotal for this order
+      orderObj.vendorSubtotal = orderObj.items.reduce(
+        (sum, item) => sum + (item.price * item.quantity), 
+        0
+      );
+      
+      return orderObj;
+    });
+    
+    // Get order counts by status (for UI filters)
+    const statusCounts = {
+      total: await Order.countDocuments({ 'items.product': { $in: productIds } }),
+      pending: await Order.countDocuments({ 'items.product': { $in: productIds }, status: 'pending' }),
+      processing: await Order.countDocuments({ 'items.product': { $in: productIds }, status: 'processing' }),
+      shipped: await Order.countDocuments({ 'items.product': { $in: productIds }, status: 'shipped' }),
+      delivered: await Order.countDocuments({ 'items.product': { $in: productIds }, status: 'delivered' }),
+      cancelled: await Order.countDocuments({ 'items.product': { $in: productIds }, status: 'cancelled' })
+    };
+    
+    // Pagination result
+    const pagination = {
+      current: page,
+      total: Math.ceil(total / limit),
+      count: total,
+      pages: Math.ceil(total / limit)
+    };
+    
+    res.status(200).json({
+      success: true,
+      count: modifiedOrders.length,
+      pagination,
+      statusCounts,
+      data: modifiedOrders
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get vendor order details
+ * @route   GET /api/orders/vendor/:id
+ * @access  Private/Vendor
+ */
+exports.getVendorOrderDetails = async (req, res, next) => {
+  try {
+    const order = await Order.findById(req.params.id).populate({
+      path: 'user',
+      select: 'name email phone'
+    });
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+    
+    // Check if order contains products from this vendor
+    const vendorProducts = await Product.find({ seller: req.user.id }, '_id');
+    const productIds = vendorProducts.map(product => product._id.toString());
+    
+    const hasVendorProducts = order.items.some(item => 
+      productIds.includes(item.product.toString())
+    );
+    
+    if (!hasVendorProducts) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to view this order'
+      });
+    }
+    
+    // Filter items to only include this vendor's products
+    const orderObj = order.toObject();
+    orderObj.items = orderObj.items.filter(item => 
+      productIds.includes(item.product.toString())
+    );
+    
+    // Calculate vendor's subtotal for this order
+    orderObj.vendorSubtotal = orderObj.items.reduce(
+      (sum, item) => sum + (item.price * item.quantity), 
+      0
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: orderObj
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update order item fulfillment status (for vendor)
+ * @route   PATCH /api/orders/:id/fulfill
+ * @access  Private/Vendor
+ */
+exports.updateOrderItemFulfillment = async (req, res, next) => {
+  try {
+    const { itemIds, fulfillmentStatus, trackingInfo } = req.body;
+    
+    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide item IDs to update'
+      });
+    }
+    
+    if (!fulfillmentStatus || !['processing', 'shipped', 'delivered'].includes(fulfillmentStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid fulfillment status (processing, shipped, or delivered)'
+      });
+    }
+    
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+    
+    // Get vendor products
+    const vendorProducts = await Product.find({ seller: req.user.id }, '_id');
+    const vendorProductIds = vendorProducts.map(product => product._id.toString());
+    
+    // Make sure all items belong to this vendor
+    for (const itemId of itemIds) {
+      const item = order.items.id(itemId);
+      
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          message: `Item with ID ${itemId} not found in this order`
+        });
+      }
+      
+      if (!vendorProductIds.includes(item.product.toString())) {
+        return res.status(403).json({
+          success: false,
+          message: `You do not have permission to update item with ID ${itemId}`
+        });
+      }
+    }
+    
+    // Update the fulfillment status of each item
+    for (const itemId of itemIds) {
+      const item = order.items.id(itemId);
+      item.fulfillmentStatus = fulfillmentStatus;
+      
+      // Add tracking info if provided and status is shipped
+      if (trackingInfo && fulfillmentStatus === 'shipped') {
+        item.trackingInfo = trackingInfo;
+        item.shippedAt = Date.now();
+      }
+      
+      if (fulfillmentStatus === 'delivered') {
+        item.deliveredAt = Date.now();
+      }
+    }
+    
+    // Check if all items have the same status to update the overall order status
+    const allItemsFulfillmentStatus = order.items.map(item => item.fulfillmentStatus);
+    const isUniform = allItemsFulfillmentStatus.every(status => status === fulfillmentStatus);
+    
+    if (isUniform) {
+      order.status = fulfillmentStatus;
+      
+      if (fulfillmentStatus === 'shipped') {
+        order.shippedAt = Date.now();
+      }
+      
+      if (fulfillmentStatus === 'delivered') {
+        order.deliveredAt = Date.now();
+      }
+    }
+    
+    await order.save();
+    
+    res.status(200).json({
+      success: true,
+      data: order
+    });
+  } catch (error) {
+    next(error);
+  }
 }; 
