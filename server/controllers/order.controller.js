@@ -805,60 +805,69 @@ exports.trackOrder = async (req, res, next) => {
  */
 exports.getOrderAnalytics = async (req, res, next) => {
   try {
-    // Get total orders and revenue
-    const totalStats = await Order.aggregate([
-      {
-        $group: {
-          _id: null,
-          totalOrders: { $sum: 1 },
-          totalRevenue: { $sum: '$totalPrice' },
-          totalPaidOrders: { $sum: { $cond: ['$isPaid', 1, 0] } },
-          paidRevenue: { $sum: { $cond: ['$isPaid', '$totalPrice', 0] } }
-        }
-      }
-    ]);
+    // Get total orders count
+    const totalOrders = await Order.countDocuments();
     
-    // Get order stats by status
-    const statusStats = await Order.aggregate([
+    // Get orders by status
+    const ordersByStatus = await Order.aggregate([
       {
         $group: {
           _id: '$status',
           count: { $sum: 1 },
-          revenue: { $sum: '$totalPrice' }
+          revenue: { 
+            $sum: {
+              $cond: [
+                { $ne: ['$status', 'cancelled'] },
+                '$totalAmount',
+                0
+              ]
+            }
+          }
         }
       }
     ]);
     
-    // Get orders by date (last 30 days)
+    // Get daily revenue for the last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
-    const dailyOrders = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: thirtyDaysAgo }
-        }
+    const dailyRevenue = await Order.aggregate([
+      { 
+        $match: { 
+          createdAt: { $gte: thirtyDaysAgo },
+          status: { $ne: 'cancelled' }
+        } 
       },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-          count: { $sum: 1 },
-          revenue: { $sum: '$totalPrice' }
+          _id: { 
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' }
+          },
+          revenue: { $sum: '$totalAmount' },
+          count: { $sum: 1 }
         }
       },
-      { $sort: { _id: 1 } }
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
     ]);
     
-    // Get popular products from orders
-    const popularProducts = await Order.aggregate([
+    // Format for frontend consumption
+    const formattedDailyRevenue = dailyRevenue.map(item => ({
+      date: `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`,
+      revenue: item.revenue,
+      count: item.count
+    }));
+    
+    // Get top selling products
+    const topSellingProducts = await Order.aggregate([
+      { $match: { status: { $ne: 'cancelled' } } },
       { $unwind: '$items' },
       {
         $group: {
           _id: '$items.product',
-          productName: { $first: '$items.name' },
           totalQuantity: { $sum: '$items.quantity' },
-          totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
-          orderCount: { $sum: 1 }
+          totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
         }
       },
       { $sort: { totalQuantity: -1 } },
@@ -868,39 +877,69 @@ exports.getOrderAnalytics = async (req, res, next) => {
           from: 'products',
           localField: '_id',
           foreignField: '_id',
-          as: 'productDetails'
+          as: 'product'
         }
       },
       {
         $project: {
           _id: 1,
-          productName: 1,
           totalQuantity: 1,
           totalRevenue: 1,
-          orderCount: 1,
-          productImage: { 
-            $cond: {
-              if: { $gt: [{ $size: '$productDetails.images' }, 0] },
-              then: { $arrayElemAt: [{ $arrayElemAt: ['$productDetails.images', 0] }, 0] },
-              else: null
-            }
-          }
+          product: { $arrayElemAt: ['$product', 0] }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          totalQuantity: 1,
+          totalRevenue: 1,
+          productName: '$product.name',
+          productImage: { $arrayElemAt: ['$product.images', 0] }
         }
       }
+    ]);
+    
+    // Calculate total revenue (excluding cancelled orders)
+    const totalRevenue = await Order.aggregate([
+      { $match: { status: { $ne: 'cancelled' } } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    ]);
+    
+    // Get orders created today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayOrders = await Order.countDocuments({
+      createdAt: { $gte: today }
+    });
+    
+    // Get revenue from today
+    const todayRevenue = await Order.aggregate([
+      { 
+        $match: { 
+          createdAt: { $gte: today },
+          status: { $ne: 'cancelled' }
+        } 
+      },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
     ]);
     
     res.status(200).json({
       success: true,
       data: {
-        summary: totalStats[0] || {
-          totalOrders: 0,
-          totalRevenue: 0,
-          totalPaidOrders: 0,
-          paidRevenue: 0
-        },
-        ordersByStatus: statusStats,
-        dailyOrders,
-        popularProducts
+        totalOrders,
+        totalRevenue: totalRevenue.length > 0 ? totalRevenue[0].total : 0,
+        todayOrders,
+        todayRevenue: todayRevenue.length > 0 ? todayRevenue[0].total : 0,
+        ordersByStatus: ordersByStatus.reduce((acc, item) => {
+          acc[item._id] = {
+            count: item.count,
+            revenue: item.revenue
+          };
+          return acc;
+        }, {}),
+        dailyRevenue: formattedDailyRevenue,
+        topSellingProducts
       }
     });
   } catch (err) {

@@ -40,10 +40,13 @@ import AdminDashboard from './pages/admin/Dashboard';
 import Products from './pages/admin/Products';
 import Categories from './pages/admin/Categories';
 import Orders from './pages/admin/Orders';
+import OrderView from './pages/admin/OrderView';
 import Customers from './pages/admin/Customers';
 import Coupons from './pages/admin/Coupons';
 import Reviews from './pages/admin/Reviews';
 import VendorApplications from './pages/admin/VendorApplications';
+import ProductView from './pages/admin/ProductView';
+import CategoryDetails from './pages/admin/CategoryDetails';
 
 // Vendor Pages
 import VendorDashboard from './pages/vendor/Dashboard';
@@ -224,11 +227,18 @@ function App() {
             <Route path="dashboard" element={<AdminDashboard />} />
             <Route path="products" element={<Products />} />
             <Route path="categories" element={<Categories />} />
+            <Route path="categories/details/:id" element={<CategoryDetails />} />
             <Route path="orders" element={<Orders />} />
+            <Route path="orders/:id" element={<OrderView />} />
             <Route path="customers" element={<Customers />} />
             <Route path="coupons" element={<Coupons />} />
             <Route path="reviews" element={<Reviews />} />
             <Route path="vendor-applications" element={<VendorApplications />} />
+            <Route path="products/:id" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <ProductView />
+              </ProtectedRoute>
+            } />
             <Route path="*" element={<NotFound />} />
           </Route>
           

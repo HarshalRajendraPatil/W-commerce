@@ -87,7 +87,7 @@ const ProductSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
-    featured: {
+    isFeatured: {
       type: Boolean,
       default: false
     },

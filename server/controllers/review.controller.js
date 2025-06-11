@@ -15,7 +15,7 @@ exports.getReviews = async (req, res, next) => {
     const queryObj = { ...req.query };
     
     // Fields to exclude from filtering
-    const excludedFields = ['page', 'sort', 'limit', 'fields'];
+    const excludedFields = ['page', 'sort', 'limit', 'fields', 'search'];
     excludedFields.forEach(field => delete queryObj[field]);
 
     // Filter by product if provided
@@ -23,18 +23,47 @@ exports.getReviews = async (req, res, next) => {
       queryObj.product = req.query.product;
     }
 
+    // Filter by approval status
+    if (req.query.isApproved === 'true') {
+      queryObj.isApproved = true;
+    } else if (req.query.isApproved === 'false') {
+      queryObj.isApproved = false;
+    }
+
+    // Filter by rejection status
+    if (req.query.isRejected === 'true') {
+      queryObj.isRejected = true;
+    } else if (req.query.isRejected === 'false') {
+      queryObj.isRejected = false;
+    }
+
+    // Filter by verified purchase
+    if (req.query.isVerifiedPurchase === 'true') {
+      queryObj.isVerifiedPurchase = true;
+    }
+
+    // Filter by rating
+    if (req.query.rating) {
+      queryObj.rating = req.query.rating;
+    }
+    
     // Filter by approved reviews for public access
-    if (!req.user || (req.user && req.user.role !== 'admin')) {
+    if (!req.user) {
+      queryObj.isApproved = true;
+      queryObj.isRejected = false;
+    } else if (req.user && req.user.role !== 'admin') {
+      // For authenticated non-admin users, only show approved reviews
       queryObj.isApproved = true;
       queryObj.isRejected = false;
     }
+    // Admin users will see all reviews regardless of status
 
     // Pagination
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const startIndex = (page - 1) * limit;
     
-    // Execute query
+    // Create base query
     let query = Review.find(queryObj)
       .skip(startIndex)
       .limit(limit)
@@ -42,7 +71,52 @@ exports.getReviews = async (req, res, next) => {
         path: 'user',
         select: 'name avatar'
       })
+      .populate({
+        path: 'product',
+        select: 'name images'
+      })
       .sort(req.query.sort || '-createdAt');
+
+    // Add search functionality
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      
+      // First, find users that match the search term
+      const users = await mongoose.model('User').find({
+        name: { $regex: searchRegex }
+      }).select('_id');
+      
+      const userIds = users.map(user => user._id);
+      
+      // Then find products that match the search term
+      const products = await mongoose.model('Product').find({
+        name: { $regex: searchRegex }
+      }).select('_id');
+      
+      const productIds = products.map(product => product._id);
+      
+      // Create search query with OR conditions
+      query = Review.find({
+        $or: [
+          { comment: { $regex: searchRegex } },
+          { title: { $regex: searchRegex } },
+          { user: { $in: userIds } },
+          { product: { $in: productIds } }
+        ],
+        ...queryObj // Keep the other filters
+      })
+      .skip(startIndex)
+      .limit(limit)
+      .populate({
+        path: 'user',
+        select: 'name avatar'
+      })
+      .populate({
+        path: 'product',
+        select: 'name images'
+      })
+      .sort(req.query.sort || '-createdAt');
+    }
 
     // Select specific fields if requested
     if (req.query.fields) {
@@ -54,7 +128,34 @@ exports.getReviews = async (req, res, next) => {
     const reviews = await query;
     
     // Get total count for pagination
-    const total = await Review.countDocuments(queryObj);
+    const countQuery = Review.find(queryObj);
+    
+    // Add search to count query if needed
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      
+      // Reuse the user and product searches from above
+      const users = await mongoose.model('User').find({
+        name: { $regex: searchRegex }
+      }).select('_id');
+      
+      const userIds = users.map(user => user._id);
+      
+      const products = await mongoose.model('Product').find({
+        name: { $regex: searchRegex }
+      }).select('_id');
+      
+      const productIds = products.map(product => product._id);
+      
+      countQuery.or([
+        { comment: { $regex: searchRegex } },
+        { title: { $regex: searchRegex } },
+        { user: { $in: userIds } },
+        { product: { $in: productIds } }
+      ]);
+    }
+    
+    const total = await countQuery.countDocuments();
     
     // Pagination result
     const pagination = {

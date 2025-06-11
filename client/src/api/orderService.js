@@ -60,16 +60,38 @@ export const getAllOrders = async (page = 1, limit = 10, filters = {}) => {
   return response.data;
 };
 
-export const updateOrderStatus = async (orderId, status, trackingNumber, note) => {
-  const response = await axios.put(`/orders/${orderId}/status`, {
-    status,
-    trackingNumber,
-    note
-  });
+export const updateOrderStatus = async (orderId, statusData) => {
+  const response = await axios.put(`/orders/${orderId}/status`, statusData);
   return response.data;
 };
 
 export const getOrderAnalytics = async () => {
   const response = await axios.get('/orders/analytics');
+  return response.data;
+};
+
+// Get all orders (admin)
+export const getOrders = async (params = {}) => {
+  const queryParams = new URLSearchParams();
+  
+  if (params.page) queryParams.append('page', params.page);
+  if (params.limit) queryParams.append('limit', params.limit);
+  if (params.sort) queryParams.append('sort', params.sort);
+  if (params.status) queryParams.append('status', params.status);
+  if (params.search) queryParams.append('search', params.search);
+  
+  const response = await axios.get(`/orders?${queryParams.toString()}`);
+  return response.data;
+};
+
+// Get user's orders
+export const getUserOrders = async (params = {}) => {
+  const queryParams = new URLSearchParams();
+  
+  if (params.page) queryParams.append('page', params.page);
+  if (params.limit) queryParams.append('limit', params.limit);
+  if (params.status) queryParams.append('status', params.status);
+  
+  const response = await axios.get(`/orders/my-orders?${queryParams.toString()}`);
   return response.data;
 }; 

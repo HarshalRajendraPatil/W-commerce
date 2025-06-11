@@ -6,7 +6,8 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
-  getFeaturedCategories
+  getFeaturedCategories,
+  getCategoryStats
 } = require('../controllers/category.controller');
 
 const router = express.Router();
@@ -20,5 +21,6 @@ router.get('/:id', getCategory);
 router.post('/', protect, authorize('admin'), createCategory);
 router.put('/:id', protect, authorize('admin'), updateCategory);
 router.delete('/:id', protect, authorize('admin'), deleteCategory);
+router.get('/:id/stats', protect, authorize('admin'), getCategoryStats);
 
 module.exports = router; 

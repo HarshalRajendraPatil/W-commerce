@@ -12,6 +12,8 @@ import vendorProductsReducer from './slices/vendorProductsSlice';
 import vendorOrdersReducer from './slices/vendorOrdersSlice';
 import vendorReviewsReducer from './slices/vendorReviewsSlice';
 import vendorAnalyticsReducer from './slices/vendorAnalyticsSlice';
+import userReducer from './slices/userSlice';
+import couponReducer from './slices/couponSlice';
 
 // Configure the Redux store
 const store = configureStore({
@@ -28,7 +30,9 @@ const store = configureStore({
     vendorProducts: vendorProductsReducer,
     vendorOrders: vendorOrdersReducer,
     vendorReviews: vendorReviewsReducer,
-    vendorAnalytics: vendorAnalyticsReducer
+    vendorAnalytics: vendorAnalyticsReducer,
+    user: userReducer,
+    coupon: couponReducer
   },
   devTools: import.meta.env.MODE !== 'production'
 });

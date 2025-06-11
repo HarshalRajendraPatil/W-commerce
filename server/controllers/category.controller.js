@@ -1,6 +1,8 @@
 const Category = require('../models/Category');
 const Product = require('../models/Product');
+const Order = require('../models/Order');
 const cloudinary = require('../utils/cloudinary');
+const mongoose = require('mongoose');
 
 /**
  * @desc    Get all categories
@@ -30,10 +32,15 @@ exports.getCategories = async (req, res, next) => {
     if (req.query.isActive) {
       query.isActive = req.query.isActive === 'true';
     }
+
+    // Filter by name search
+    if (req.query.search) {
+      query.name = { $regex: req.query.search, $options: 'i' };
+    }
     
     // Execute query with sorting by order
     const categories = await Category.find(query)
-      .sort('order name')
+      .sort(req.query.sort || 'order name')
       .populate({
         path: 'parent',
         select: 'name slug'
@@ -42,6 +49,24 @@ exports.getCategories = async (req, res, next) => {
         path: 'subcategories',
         select: 'name slug'
       });
+    
+    // For admin requests, include product counts per category
+    if (req.query.includeStats === 'true') {
+      const categoriesWithStats = await Promise.all(
+        categories.map(async (category) => {
+          const productCount = await Product.countDocuments({ category: category._id });
+          const categoryObj = category.toObject();
+          categoryObj.productCount = productCount;
+          return categoryObj;
+        })
+      );
+      
+      return res.status(200).json({
+        success: true,
+        count: categoriesWithStats.length,
+        data: categoriesWithStats
+      });
+    }
     
     res.status(200).json({
       success: true,
@@ -279,6 +304,97 @@ exports.getFeaturedCategories = async (req, res, next) => {
       success: true,
       count: categories.length,
       data: categories
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Get category statistics
+ * @route   GET /api/categories/:id/stats
+ * @access  Private (Admin only)
+ */
+exports.getCategoryStats = async (req, res, next) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: 'Category not found'
+      });
+    }
+    
+    // Get product statistics
+    const productCount = await Product.countDocuments({ category: category._id });
+    const avgProductPrice = await Product.aggregate([
+      { $match: { category: new mongoose.Types.ObjectId(category._id) } },
+      { $group: { _id: null, avg: { $avg: '$price' } } }
+    ]);
+    
+    // Get top selling products in this category
+    const topProducts = await Product.find({ category: category._id })
+      .sort('-soldCount')
+      .limit(5)
+      .select('name price images soldCount averageRating');
+    
+    // Get order statistics
+    const orderStats = await Order.aggregate([
+      { $unwind: '$items' },
+      { $lookup: { from: 'products', localField: 'items.product', foreignField: '_id', as: 'productInfo' } },
+      { $unwind: '$productInfo' },
+      { $match: { 'productInfo.category': new mongoose.Types.ObjectId(category._id) } },
+      { $group: {
+          _id: null,
+          totalSales: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
+          totalOrders: { $sum: 1 },
+          totalItems: { $sum: '$items.quantity' }
+        }
+      }
+    ]);
+    
+    // Get monthly sales trends
+    const monthlyTrends = await Order.aggregate([
+      { $match: { status: { $in: ['delivered', 'completed'] } } },
+      { $unwind: '$items' },
+      { $lookup: { from: 'products', localField: 'items.product', foreignField: '_id', as: 'productInfo' } },
+      { $unwind: '$productInfo' },
+      { $match: { 'productInfo.category': new mongoose.Types.ObjectId(category._id) } },
+      { $group: {
+          _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+          sales: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+          count: { $sum: '$items.quantity' }
+        }
+      },
+      { $sort: { '_id': 1 } },
+      { $limit: 12 }
+    ]);
+    
+    // Get recent orders containing products from this category
+    const recentOrders = await Order.find({
+      'items.product': { $in: await Product.find({ category: category._id }).distinct('_id') }
+    })
+    .sort('-createdAt')
+    .limit(5)
+    .populate('user', 'name email')
+    .select('trackingNumber totalPrice status createdAt items');
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        category,
+        stats: {
+          productCount,
+          averagePrice: avgProductPrice.length > 0 ? avgProductPrice[0].avg : 0,
+          sales: orderStats.length > 0 ? orderStats[0].totalSales : 0,
+          orders: orderStats.length > 0 ? orderStats[0].totalOrders : 0,
+          itemsSold: orderStats.length > 0 ? orderStats[0].totalItems : 0
+        },
+        topProducts,
+        monthlyTrends,
+        recentOrders
+      }
     });
   } catch (err) {
     next(err);

@@ -3,18 +3,23 @@ const router = express.Router();
 const couponController = require('../controllers/coupon.controller');
 const { protect, authorize } = require('../middleware/auth.middleware');
 
-// Apply/remove coupon routes (requires user authentication)
-router.post('/apply', protect, couponController.applyCoupon);
-router.delete('/remove', protect, couponController.removeCoupon);
+// Public route for validating coupons
+router.post('/validate', protect, couponController.validateCoupon);
 
-// Admin routes (requires admin privileges)
-router.route('/')
-  .get(protect, authorize('admin'), couponController.getAllCoupons)
-  .post(protect, authorize('admin'), couponController.createCoupon);
+// Admin only routes
+router.use(protect);
 
-router.route('/:id')
-  .get(protect, authorize('admin'), couponController.getCoupon)
-  .put(protect, authorize('admin'), couponController.updateCoupon)
-  .delete(protect, authorize('admin'), couponController.deleteCoupon);
+router.post('/apply', couponController.applyCoupon);
+router.delete('/remove', couponController.removeCoupon);
+
+router.use(authorize('admin'));
+
+router.get('/', couponController.getCoupons);
+router.get('/analytics', couponController.getCouponAnalytics);
+router.post('/', couponController.createCoupon);
+router.get('/:id', couponController.getCoupon);
+router.put('/:id', couponController.updateCoupon);
+router.delete('/:id', couponController.deleteCoupon);
+router.get('/:id/stats', couponController.getCouponStats);
 
 module.exports = router; 

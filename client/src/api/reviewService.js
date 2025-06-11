@@ -1,14 +1,34 @@
 import axios from './axios';
 
-// Get all reviews (with optional product filter)
-export const getReviews = async (page = 1, limit = 10, productId = null) => {
+// Get all reviews (with optional filters)
+export const getReviews = async (params = {}) => {
+  const { 
+    page = 1, 
+    limit = 10, 
+    productId = null,
+    search = null,
+    isApproved = null,
+    isRejected = null,
+    isVerifiedPurchase = null,
+    rating = null,
+    sort = null
+  } = params;
+  
   const queryParams = new URLSearchParams({
     page,
-    limit,
-    ...(productId && { product: productId })
-  }).toString();
+    limit
+  });
   
-  const response = await axios.get(`/reviews?${queryParams}`);
+  // Add optional filters
+  if (productId) queryParams.append('product', productId);
+  if (search) queryParams.append('search', search);
+  if (isApproved !== null) queryParams.append('isApproved', isApproved);
+  if (isRejected !== null) queryParams.append('isRejected', isRejected);
+  if (isVerifiedPurchase !== null) queryParams.append('isVerifiedPurchase', isVerifiedPurchase);
+  if (rating) queryParams.append('rating', rating);
+  if (sort) queryParams.append('sort', sort);
+  
+  const response = await axios.get(`/reviews?${queryParams.toString()}`);
   return response.data;
 };
 

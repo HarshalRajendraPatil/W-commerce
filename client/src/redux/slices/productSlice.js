@@ -1,15 +1,24 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-// Base URL for API requests
-const API_URL = '/api/products';
+import axios from '../../api/axios';
 
 // Async thunks for product operations
 export const fetchProducts = createAsyncThunk(
   'products/fetchProducts',
-  async (_, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await axios.get(API_URL);
+      // Convert params object to URL query params
+      const queryParams = new URLSearchParams();
+      
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, value);
+        }
+      }
+      
+      const queryString = queryParams.toString();
+      const url = queryString ? `/products?${queryString}` : '/products';
+      
+      const response = await axios.get(url);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -21,8 +30,8 @@ export const fetchProductById = createAsyncThunk(
   'products/fetchProductById',
   async (id, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_URL}/${id}`);
-      return response.data;
+      const response = await axios.get(`/products/${id}`);
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
     }
@@ -33,8 +42,8 @@ export const createProduct = createAsyncThunk(
   'products/createProduct',
   async (productData, { rejectWithValue }) => {
     try {
-      const response = await axios.post(API_URL, productData);
-      return response.data;
+      const response = await axios.post("/products", productData);
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
     }
@@ -45,8 +54,8 @@ export const updateProduct = createAsyncThunk(
   'products/updateProduct',
   async ({ id, productData }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(`${API_URL}/${id}`, productData);
-      return response.data;
+      const response = await axios.put(`/products/${id}`, productData);
+      return response.data.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
     }
@@ -57,10 +66,35 @@ export const deleteProduct = createAsyncThunk(
   'products/deleteProduct',
   async (id, { rejectWithValue }) => {
     try {
-      await axios.delete(`${API_URL}/${id}`);
+      await axios.delete(`/products/${id}`);
       return id;
     } catch (error) {
       return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const toggleFeatured = createAsyncThunk(
+  'products/toggleFeatured',
+  async (id, { rejectWithValue, getState }) => {
+    try {
+      // Find the product in the state to get its current featured status
+      const { products } = getState().product;
+      const product = products.data?.find(p => p._id === id);
+      
+      if (!product) {
+        throw new Error('Product not found');
+      }
+
+      
+      // Update the product with the opposite featured status
+      const response = await axios.put(`/products/${id}`, {
+        isFeatured: !product.isFeatured
+      });
+      
+      return response.data.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: error.message });
     }
   }
 );
@@ -164,6 +198,23 @@ const productSlice = createSlice({
       .addCase(deleteProduct.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload ? action.payload.message : 'Failed to delete product';
+      })
+      
+      // Toggle featured status
+      .addCase(toggleFeatured.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(toggleFeatured.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.products = state.products.data?.map(product => 
+          product._id === action.payload._id ? action.payload : product
+        );
+        state.success = true;
+        state.message = `Product ${action.payload.isFeatured ? 'marked as featured' : 'unmarked as featured'} successfully`;
+      })
+      .addCase(toggleFeatured.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload ? action.payload.message : 'Failed to update featured status';
       });
   }
 });

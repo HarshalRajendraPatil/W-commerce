@@ -14,7 +14,8 @@ const {
   getRelatedProducts,
   getVendorProducts,
   updateProductStock,
-  updateProductStatus
+  updateProductStatus,
+  toggleFeaturedStatus
 } = require('../controllers/product.controller');
 
 const router = express.Router();
@@ -33,6 +34,9 @@ router.get('/:id/related', getRelatedProducts);
 router.get('/vendor/products', protect, authorize('vendor', 'admin'), getVendorProducts);
 router.patch('/:id/stock', protect, authorize('vendor', 'admin'), updateProductStock);
 router.patch('/:id/status', protect, authorize('vendor', 'admin'), updateProductStatus);
+
+// Admin specific routes
+router.patch('/:id/featured', protect, authorize('admin'), toggleFeaturedStatus);
 
 // Protected routes - only vendors and admins can create/update/delete products
 router.post('/', protect, authorize('vendor', 'admin'), createProduct);

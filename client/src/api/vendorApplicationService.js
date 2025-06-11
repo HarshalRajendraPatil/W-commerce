@@ -16,7 +16,6 @@ const vendorApplicationService = {
   // Admin: Get all vendor applications
   getAllApplications: async (params = {}) => {
     const response = await api.get('/vendor-applications', { params });
-    console.log(response.data);
     return response.data;
   },
 

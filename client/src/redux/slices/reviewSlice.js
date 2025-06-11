@@ -4,9 +4,9 @@ import * as reviewService from '../../api/reviewService';
 // Async thunks
 export const getReviews = createAsyncThunk(
   'review/getReviews',
-  async ({ page, limit, productId }, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      return await reviewService.getReviews(page, limit, productId);
+      return await reviewService.getReviews(params);
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch reviews');
     }

@@ -23,11 +23,25 @@ exports.getProducts = async (req, res, next) => {
     const queryObj = { ...req.query };
 
     // Fields to exclude from filtering
-    const excludedFields = ['page', 'sort', 'limit', 'fields', 'q'];
+    const excludedFields = ['page', 'sort', 'limit', 'fields', 'q', 'search', 'minPrice', 'maxPrice', 'stockStatus', 'isFeatured'];
     excludedFields.forEach(field => delete queryObj[field]);
     
-    // Filter for published products only
-    queryObj.published = true;
+    // Only filter for published products in public requests, not for admin requests
+    const isAdminRequest = req.originalUrl.includes('/admin');
+    if (!isAdminRequest) {
+      queryObj.published = true;
+    }
+    
+    // Search functionality (by name, SKU, or description)
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      queryObj.$or = [
+        { name: searchRegex },
+        { sku: searchRegex },
+        { description: searchRegex },
+        { brand: searchRegex }
+      ];
+    }
     
     // Filter by price range
     if (req.query.minPrice || req.query.maxPrice) {
@@ -53,12 +67,30 @@ exports.getProducts = async (req, res, next) => {
       }
     }
 
+    // Filter by brand
     if (req.query.brand) {
       queryObj.brand = req.query.brand;
     }
 
+    // Filter by discount
     if (req.query.discount) {
-      queryObj.discountPrice = { gte: req.query.discount };
+      queryObj.discountPercentage = { $gt: parseInt(req.query.discount) };
+    }
+    
+    // Filter by featured status
+    if (req.query.isFeatured !== undefined) {
+      queryObj.isFeatured = req.query.isFeatured === 'true';
+    }
+    
+    // Filter by stock status
+    if (req.query.stockStatus) {
+      if (req.query.stockStatus === 'low') {
+        queryObj.stockCount = { $lt: 10, $gt: 0 };
+      } else if (req.query.stockStatus === 'out') {
+        queryObj.stockCount = 0;
+      } else if (req.query.stockStatus === 'in') {
+        queryObj.stockCount = { $gt: 0 };
+      }
     }
     
     // Advanced filtering (gt, gte, lt, lte, in)
@@ -83,6 +115,17 @@ exports.getProducts = async (req, res, next) => {
     
     // Get total count
     const total = await Product.countDocuments(JSON.parse(queryStr));
+    
+    // Get product status counts (for admin dashboard)
+    let statusCounts = {};
+    if (isAdminRequest) {
+      statusCounts = {
+        total: await Product.countDocuments({}),
+        featured: await Product.countDocuments({ isFeatured: true }),
+        outOfStock: await Product.countDocuments({ stockCount: 0 }),
+        lowStock: await Product.countDocuments({ stockCount: { $lt: 10, $gt: 0 } })
+      };
+    }
     
     // Pagination result
     const pagination = {
@@ -109,6 +152,7 @@ exports.getProducts = async (req, res, next) => {
       success: true,
       pagination,
       count: products.length,
+      statusCounts: isAdminRequest ? statusCounts : undefined,
       data: products
     });
   } catch (err) {
@@ -540,7 +584,7 @@ exports.getFeaturedProducts = async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 5;
     
-    const products = await Product.find({ featured: true, published: true })
+    const products = await Product.find({ isFeatured: true, published: true })
       .limit(limit)
       .sort('-createdAt')
       .populate({ path: 'category', select: 'name slug' });
@@ -813,6 +857,46 @@ exports.getRelatedProducts = async (req, res, next) => {
       success: true,
       count: relatedProducts.length,
       data: relatedProducts
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Toggle product featured status
+ * @route   PATCH /api/products/:id/featured
+ * @access  Private (Admin only)
+ */
+exports.toggleFeaturedStatus = async (req, res, next) => {
+  try {
+    let product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
+    
+    // Only admin can set featured status
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update featured status'
+      });
+    }
+    
+    // Toggle the featured status
+    product = await Product.findByIdAndUpdate(
+      req.params.id, 
+      { isFeatured: !product.isFeatured }, 
+      { new: true }
+    );
+    
+    res.status(200).json({
+      success: true,
+      data: product
     });
   } catch (err) {
     next(err);

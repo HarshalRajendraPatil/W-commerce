@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import * as orderService from '../../api/orderService';
+import { toast } from 'react-hot-toast';
 
 // Async thunks
 export const createOrder = createAsyncThunk(
@@ -93,9 +94,9 @@ export const getAllOrders = createAsyncThunk(
 
 export const updateOrderStatus = createAsyncThunk(
   'order/updateOrderStatus',
-  async ({ orderId, status, trackingNumber, note }, { rejectWithValue }) => {
+  async ({ orderId, statusData }, { rejectWithValue }) => {
     try {
-      return await orderService.updateOrderStatus(orderId, status, trackingNumber, note);
+      return await orderService.updateOrderStatus(orderId, statusData);
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update order status');
     }
@@ -104,6 +105,30 @@ export const updateOrderStatus = createAsyncThunk(
 
 export const getOrderAnalytics = createAsyncThunk(
   'order/getOrderAnalytics',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await orderService.getOrderAnalytics();
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch order analytics');
+    }
+  }
+);
+
+// Admin: Get all orders with filtering
+export const fetchOrders = createAsyncThunk(
+  'order/fetchOrders',
+  async (params, { rejectWithValue }) => {
+    try {
+      return await orderService.getOrders(params);
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch orders');
+    }
+  }
+);
+
+// Admin: Get order analytics
+export const fetchOrderAnalytics = createAsyncThunk(
+  'order/fetchOrderAnalytics',
   async (_, { rejectWithValue }) => {
     try {
       return await orderService.getOrderAnalytics();
@@ -128,6 +153,13 @@ const initialState = {
   error: null,
   success: false,
   successMessage: '',
+  adminOrders: [],
+  adminPagination: {
+    current: 1,
+    total: 1,
+    count: 0
+  },
+  orderAnalytics: null,
 };
 
 const orderSlice = createSlice({
@@ -287,6 +319,21 @@ const orderSlice = createSlice({
         state.error = action.payload;
       })
       
+      // Admin: Fetch Orders
+      .addCase(fetchOrders.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchOrders.fulfilled, (state, action) => {
+        state.loading = false;
+        state.adminOrders = action.payload.data;
+        state.adminPagination = action.payload.pagination;
+      })
+      .addCase(fetchOrders.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      
       // Admin: Update Order Status
       .addCase(updateOrderStatus.pending, (state) => {
         state.loading = true;
@@ -294,32 +341,39 @@ const orderSlice = createSlice({
       })
       .addCase(updateOrderStatus.fulfilled, (state, action) => {
         state.loading = false;
-        state.currentOrder = action.payload.data;
         state.success = true;
-        state.successMessage = 'Order status updated successfully';
+        state.message = 'Order status updated successfully';
         
-        // Update in orders list if present
-        if (state.orders.length > 0) {
-          state.orders = state.orders.map(order => 
+        // Update the order in the admin orders list
+        if (state.adminOrders.length > 0) {
+          state.adminOrders = state.adminOrders.map(order => 
             order._id === action.payload.data._id ? action.payload.data : order
           );
         }
+        
+        // Also update in current order if it matches
+        if (state.currentOrder && state.currentOrder._id === action.payload.data._id) {
+          state.currentOrder = action.payload.data;
+        }
+        
+        toast.success('Order status updated successfully');
       })
       .addCase(updateOrderStatus.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        toast.error(action.payload);
       })
       
       // Admin: Get Order Analytics
-      .addCase(getOrderAnalytics.pending, (state) => {
+      .addCase(fetchOrderAnalytics.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(getOrderAnalytics.fulfilled, (state, action) => {
+      .addCase(fetchOrderAnalytics.fulfilled, (state, action) => {
         state.loading = false;
-        state.analytics = action.payload.data;
+        state.orderAnalytics = action.payload.data;
       })
-      .addCase(getOrderAnalytics.rejected, (state, action) => {
+      .addCase(fetchOrderAnalytics.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
