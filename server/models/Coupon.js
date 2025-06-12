@@ -136,11 +136,13 @@ CouponSchema.methods.isValid = function (userId, cartTotal) {
   let discount = 0;
   if (this.type === 'percentage') {
     discount = (cartTotal * this.value) / 100;
+    this.discountAmount = discount;
     if (this.maxDiscount && discount > this.maxDiscount) {
       discount = this.maxDiscount;
     }
   } else {
     discount = this.value;
+    this.discountAmount = discount;
     if (discount > cartTotal) {
       discount = cartTotal;
     }

@@ -53,12 +53,14 @@ const OrderReview = ({ checkoutData, onBack }) => {
     }
     
     setIsProcessing(true);
+
+    console.log(cart);
     
     try {
       // Calculate values
       const subtotal = cart.totalPrice;
-      const taxPrice = subtotal * 0.05; // 5% tax
-      const shippingPrice = 0; // Free shipping
+      const taxPrice = subtotal * 0.18; // 18% tax
+      const shippingPrice = 10; // Free shipping
       const discountAmount = cart.discountAmount || 0;
       const totalPrice = subtotal + taxPrice - discountAmount;
       
@@ -71,7 +73,9 @@ const OrderReview = ({ checkoutData, onBack }) => {
           selectedVariants: item.selectedVariants || []
         })),
         shippingAddress: checkoutData.shippingAddress,
+        billingAddress: checkoutData.billingAddress || checkoutData.shippingAddress,
         paymentMethod: 'razorpay',
+        couponCode: cart.coupon?.code,
         itemsPrice: subtotal,
         taxPrice: taxPrice,
         shippingPrice: shippingPrice,

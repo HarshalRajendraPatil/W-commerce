@@ -1,24 +1,51 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { fetchOrders, updateOrderStatus } from '../../redux/slices/orderSlice';
+import { fetchOrders, updateOrderStatus, fetchOrderAnalytics } from '../../redux/slices/orderSlice';
 import { toast } from 'react-toastify';
+import { FiPackage, FiDollarSign, FiClock, FiTruck, FiSearch, FiFilter, FiCalendar, FiChevronDown, FiChevronUp, FiCheck, FiXCircle } from 'react-icons/fi';
+import Loader from '../../components/common/Loader';
+import SkeletonLoader from '../../components/common/SkeletonLoader';
 
 const Orders = () => {
   const dispatch = useDispatch();
-  const { adminOrders, adminPagination, loading, error } = useSelector((state) => state.order);
+  const { adminOrders, adminPagination, loading, error, orderAnalytics } = useSelector((state) => state.order);
   
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [dateFilter, setDateFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [sortOrder, setSortOrder] = useState('-createdAt');
   
-  // Load orders on component mount and when filters change
-  useEffect(() => {
+  // Memoized analytics data for better performance
+  const stats = useMemo(() => {
+    if (!orderAnalytics) return null;
+    
+    return {
+      totalOrders: orderAnalytics.totalOrders || 0,
+      totalRevenue: orderAnalytics.totalRevenue?.toFixed(2) || 0,
+      todayOrders: orderAnalytics.todayOrders || 0,
+      todayRevenue: orderAnalytics.todayRevenue?.toFixed(2) || 0,
+      processingOrders: orderAnalytics.ordersByStatus?.processing || 0,
+      shippedOrders: orderAnalytics.ordersByStatus?.shipped || 0,
+      deliveredOrders: orderAnalytics.ordersByStatus?.delivered || 0,
+      cancelledOrders: orderAnalytics.ordersByStatus?.cancelled || 0
+    };
+  }, [orderAnalytics]);
+  
+  // Function to build params object for API call
+  const buildOrderParams = () => {
     const params = {
       page: currentPage,
       limit: 10,
-      sort: '-createdAt'
+      sort: sortOrder
     };
     
     if (searchTerm) {
@@ -29,8 +56,84 @@ const Orders = () => {
       params.status = statusFilter;
     }
     
-    dispatch(fetchOrders(params));
-  }, [dispatch, currentPage, statusFilter, searchTerm]);
+    if (startDate && endDate) {
+      params.startDate = startDate;
+      params.endDate = endDate;
+    } else if (dateFilter) {
+      const today = new Date();
+      const getDateRange = () => {
+        switch (dateFilter) {
+          case 'today':
+            return { startDate: format(today, 'yyyy-MM-dd') };
+          case 'yesterday': {
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            return { startDate: format(yesterday, 'yyyy-MM-dd'), endDate: format(yesterday, 'yyyy-MM-dd') };
+          }
+          case 'last7days': {
+            const last7days = new Date(today);
+            last7days.setDate(last7days.getDate() - 7);
+            return { startDate: format(last7days, 'yyyy-MM-dd') };
+          }
+          case 'last30days': {
+            const last30days = new Date(today);
+            last30days.setDate(last30days.getDate() - 30);
+            return { startDate: format(last30days, 'yyyy-MM-dd') };
+          }
+          case 'thisMonth': {
+            const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            return { startDate: format(firstDayOfMonth, 'yyyy-MM-dd') };
+          }
+          default:
+            return {};
+        }
+      };
+      
+      const dateRange = getDateRange();
+      if (dateRange.startDate) params.startDate = dateRange.startDate;
+      if (dateRange.endDate) params.endDate = dateRange.endDate;
+    }
+    
+    if (minAmount) params.minAmount = minAmount;
+    if (maxAmount) params.maxAmount = maxAmount;
+    
+    return params;
+  };
+  
+  // Load orders on page change
+  useEffect(() => {
+    dispatch(fetchOrders(buildOrderParams()));
+  }, [dispatch, currentPage]);
+  
+  // Debounce filter changes
+  useEffect(() => {
+    if (loading) return; // Don't send requests while loading
+    
+    const timer = setTimeout(() => {
+      setCurrentPage(1); // Reset to first page when filters change
+      dispatch(fetchOrders(buildOrderParams()));
+    }, 400);
+    
+    return () => clearTimeout(timer);
+  }, [statusFilter, searchTerm, dateFilter, startDate, endDate, minAmount, maxAmount, sortOrder]);
+  
+  // Fetch order analytics only once when component mounts
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      if (!orderAnalytics) {
+        setAnalyticsLoading(true);
+        try {
+          await dispatch(fetchOrderAnalytics()).unwrap();
+        } catch (error) {
+          toast.error('Failed to load order analytics');
+        } finally {
+          setAnalyticsLoading(false);
+        }
+      }
+    };
+    
+    loadAnalytics();
+  }, [dispatch, orderAnalytics]);
   
   // Add document-wide click handler to close dropdowns when clicking outside
   useEffect(() => {
@@ -80,6 +183,25 @@ const Orders = () => {
     }
   };
   
+  // Handle sort change
+  const handleSortChange = (e) => {
+    setSortOrder(e.target.value);
+    setCurrentPage(1);
+  };
+  
+  // Reset filters
+  const handleResetFilters = () => {
+    setStatusFilter('');
+    setSearchTerm('');
+    setDateFilter('');
+    setStartDate('');
+    setEndDate('');
+    setMinAmount('');
+    setMaxAmount('');
+    setSortOrder('-createdAt');
+    setCurrentPage(1);
+  };
+  
   // Helper function to get status badge style
   const getStatusBadgeClass = (status) => {
     switch (status) {
@@ -119,57 +241,220 @@ const Orders = () => {
         }
         
         toast.success(`Order status updated to ${newStatus}`);
-        // No need to refresh the list, the Redux state update will handle it
+        // Refresh analytics
+        dispatch(fetchOrderAnalytics());
       } catch (error) {
         toast.error(error || "Failed to update status");
       }
     }
   };
+
+  console.log(stats);
   
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-900">Orders</h1>
       
+      {/* Stats Cards */}
+      {analyticsLoading ? (
+        <SkeletonLoader.StatCard count={4} />
+      ) : !stats ? (
+        <div className="text-center py-6">
+          <p className="text-gray-500">No analytics data available</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-blue-100 text-blue-800">
+                <FiPackage className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Total Orders</h3>
+                <p className="text-2xl font-bold mt-1">{stats.totalOrders}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-green-100 text-green-800">
+                <FiDollarSign className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Revenue</h3>
+                <p className="text-2xl font-bold mt-1">${stats.totalRevenue}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-yellow-100 text-yellow-800">
+                <FiPackage className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Today's Orders</h3>
+                <p className="text-2xl font-bold mt-1">{stats.todayOrders}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-indigo-100 text-indigo-800">
+              <FiDollarSign className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Today's Revenue</h3>
+                <p className="text-2xl font-bold mt-1">{stats.todayRevenue}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-        <div className="w-full sm:w-1/3">
-          <form onSubmit={handleSearch} className="flex">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search orders..."
-              className="border border-gray-300 rounded-l-md px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              type="submit"
-              className="bg-indigo-600 text-white px-4 py-2 rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      <div className="bg-white p-4 rounded-md shadow">
+        <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+          <div className="w-full sm:w-1/3">
+            <form onSubmit={handleSearch} className="flex">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search orders by ID, customer..."
+                className="border border-gray-300 rounded-l-md px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                type="submit"
+                className="bg-indigo-600 text-white px-4 py-2 rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <FiSearch className="h-5 w-5" />
+              </button>
+            </form>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <select 
+              value={statusFilter}
+              onChange={handleStatusFilterChange}
+              className="border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              Search
+              <option value="">All Orders</option>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="refunded">Refunded</option>
+            </select>
+            
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="flex items-center px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50"
+            >
+              <FiFilter className="mr-2 h-4 w-4" />
+              {showAdvancedFilters ? 'Hide Filters' : 'Advanced Filters'}
+              {showAdvancedFilters ? <FiChevronUp className="ml-1 h-4 w-4" /> : <FiChevronDown className="ml-1 h-4 w-4" />}
             </button>
-          </form>
+            
+            <select
+              value={sortOrder}
+              onChange={handleSortChange}
+              className="border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="-createdAt">Newest First</option>
+              <option value="createdAt">Oldest First</option>
+              <option value="-totalPrice">Highest Amount</option>
+              <option value="totalPrice">Lowest Amount</option>
+            </select>
+          </div>
         </div>
         
-        <div>
-          <select 
-            value={statusFilter}
-            onChange={handleStatusFilterChange}
-            className="border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">All Orders</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="shipped">Shipped</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="refunded">Refunded</option>
-          </select>
-        </div>
+        {showAdvancedFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      setDateFilter('');
+                    }}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      setDateFilter('');
+                    }}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Quick Date Filter</label>
+                <select
+                  value={dateFilter}
+                  onChange={(e) => {
+                    setDateFilter(e.target.value);
+                    setStartDate('');
+                    setEndDate('');
+                  }}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="">Select period</option>
+                  <option value="today">Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="last7days">Last 7 days</option>
+                  <option value="last30days">Last 30 days</option>
+                  <option value="thisMonth">This month</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount Range</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min Amount"
+                    value={minAmount}
+                    onChange={(e) => setMinAmount(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max Amount"
+                    value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="md:col-span-3 flex justify-end">
+                <button
+                  onClick={handleResetFilters}
+                  className="px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       {loading ? (
-        <div className="text-center py-4">
-          <p className="text-gray-500">Loading orders...</p>
+        <div className="bg-white shadow overflow-hidden sm:rounded-md mt-4">
+          <SkeletonLoader.TableRow columns={6} rows={5} />
         </div>
       ) : error ? (
         <div className="bg-red-50 p-4 rounded-md">

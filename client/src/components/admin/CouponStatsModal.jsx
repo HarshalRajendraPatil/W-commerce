@@ -1,12 +1,13 @@
 import React from 'react';
 import { format } from 'date-fns';
+import Loader from '../common/Loader';
 
 const CouponStatsModal = ({ coupon, stats, onClose }) => {
   if (!coupon) return null;
 
   return (
-    <div className="fixed inset-0 overflow-y-auto z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-screen overflow-y-auto">
+    <div className="fixed inset-0 overflow-y-auto z-50 flex items-center justify-center bg-transparent backdrop-blur-sm shadow-lg bg-opacity-50">
+      <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-screen overflow-y-auto relative">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold">Coupon Statistics</h2>
           <button
@@ -62,44 +63,79 @@ const CouponStatsModal = ({ coupon, stats, onClose }) => {
           </div>
         </div>
 
-        <div className="border-t border-gray-200 pt-6 mb-6">
-          <h3 className="text-lg font-semibold mb-4">Usage Statistics</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h4 className="text-sm font-medium text-gray-500 mb-1">Total Usage</h4>
-              <p className="text-xl font-semibold text-gray-900">{stats?.usageCount || 0}</p>
-              {coupon.usageLimit > 0 && (
-                <p className="text-sm text-gray-600">
-                  {coupon.usageLimit - (stats?.usageCount || 0)} uses remaining
-                </p>
-              )}
-            </div>
-            
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h4 className="text-sm font-medium text-gray-500 mb-1">Total Discount Amount</h4>
-              <p className="text-xl font-semibold text-green-600">
-                ${(stats?.totalDiscountAmount || 0).toFixed(2)}
-              </p>
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h4 className="text-sm font-medium text-gray-500 mb-1">Average Discount</h4>
-              <p className="text-xl font-semibold text-gray-900">
-                ${stats?.usageCount ? (stats.totalDiscountAmount / stats.usageCount).toFixed(2) : '0.00'}
-              </p>
-            </div>
-            
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h4 className="text-sm font-medium text-gray-500 mb-1">Usage Rate</h4>
-              <p className="text-xl font-semibold text-gray-900">
-                {coupon.usageLimit > 0 
-                  ? `${((stats?.usageCount || 0) / coupon.usageLimit * 100).toFixed(1)}%`
-                  : 'Unlimited'}
-              </p>
-            </div>
+        {!stats ? (
+          <div className="py-8">
+            <Loader size="medium" text="Loading usage statistics..." />
           </div>
-        </div>
+        ) : (
+          <div className="border-t border-gray-200 pt-6 mb-6">
+            <h3 className="text-lg font-semibold mb-4">Usage Statistics</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 p-4 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500 mb-1">Total Usage</h4>
+                <p className="text-xl font-semibold text-gray-900">{stats.usageCount || 0}</p>
+                {coupon.usageLimit > 0 && (
+                  <p className="text-sm text-gray-600">
+                    {coupon.usageLimit - (stats.usageCount || 0)} uses remaining
+                  </p>
+                )}
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500 mb-1">Total Discount Amount</h4>
+                <p className="text-xl font-semibold text-green-600">
+                  ${(stats.totalDiscountAmount || 0).toFixed(2)}
+                </p>
+              </div>
+
+              <div className="bg-gray-50 p-4 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500 mb-1">Average Discount</h4>
+                <p className="text-xl font-semibold text-gray-900">
+                  ${stats.usageCount ? (stats.totalDiscountAmount / stats.usageCount).toFixed(2) : '0.00'}
+                </p>
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-md">
+                <h4 className="text-sm font-medium text-gray-500 mb-1">Usage Rate</h4>
+                <p className="text-xl font-semibold text-gray-900">
+                  {coupon.usageLimit > 0 
+                    ? `${((stats.usageCount || 0) / coupon.usageLimit * 100).toFixed(1)}%`
+                    : 'Unlimited'}
+                </p>
+              </div>
+            </div>
+            
+            {stats.topUsers && stats.topUsers.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-4">Top Users</h3>
+                <div className="bg-gray-50 rounded-md overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage Count</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Discount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {stats.topUsers.map((user, index) => (
+                        <tr key={index}>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{user.user.name}</div>
+                            <div className="text-xs text-gray-500">{user.user.email}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{user.count}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${user.totalDiscount.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end">
           <button

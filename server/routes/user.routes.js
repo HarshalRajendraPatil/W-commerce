@@ -14,4 +14,7 @@ router.get('/:id', userController.getUser);
 router.put('/:id', userController.updateUser);
 router.delete('/:id', userController.deleteUser);
 
+// Add the analytics route after the other admin routes
+router.get('/analytics', protect, authorize('admin'), userController.getUserAnalytics);
+
 module.exports = router; 

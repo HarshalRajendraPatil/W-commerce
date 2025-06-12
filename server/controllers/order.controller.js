@@ -115,13 +115,12 @@ exports.createOrder = async (req, res, next) => {
     let couponId = null;
     
     if (couponCode) {
-      const coupon = await Coupon.findOne({
-        code: couponCode.toUpperCase(),
-        isActive: true,
-        expiryDate: { $gt: Date.now() }
-      });
+      // Find coupon by code, not by ID
+      const coupon = await Coupon.findOne({ code: couponCode });
       
-      if (!coupon) {
+      console.log(`Coupon lookup for code ${couponCode}:`, coupon);
+      
+      if (!coupon || !coupon.isActive || new Date(coupon.endDate) < new Date()) {
         return res.status(400).json({
           success: false,
           message: 'Invalid or expired coupon code'
@@ -129,47 +128,53 @@ exports.createOrder = async (req, res, next) => {
       }
       
       // Check if minimum purchase requirement is met
-      if (coupon?.minimumPurchase && itemsPrice < coupon?.minimumPurchase) {
+      if (coupon?.minPurchase && itemsPrice < coupon.minPurchase) {
         return res.status(400).json({
           success: false,
-          message: `Minimum purchase of $${coupon?.minimumPurchase} required to use this coupon`
+          message: `Minimum purchase of $${coupon.minPurchase} required to use this coupon`
         });
       }
       
-      // Check if user has already used this coupon (if it's single-use)
-      if (coupon?.isSingleUse) {
-        const usedCoupon = await Order.findOne({
+      // Check if user has already used this coupon and reached per-user limit
+      if (coupon?.perUserLimit > 0) {
+        const usedCount = await Order.countDocuments({
           user: req.user.id,
           coupon: coupon._id
         });
         
-        if (usedCoupon) {
+        if (usedCount >= coupon.perUserLimit) {
           return res.status(400).json({
             success: false,
-            message: 'You have already used this coupon'
+            message: `You have reached the usage limit (${coupon.perUserLimit}) for this coupon`
           });
         }
       }
       
       // Calculate discount
-      if (coupon?.discountType === 'percentage') {
-        discountAmount = (itemsPrice * coupon.discountValue) / 100;
+      if (coupon && coupon.type === 'percentage') {
+        discountAmount = (itemsPrice * coupon.value) / 100;
         
         // Apply maximum discount if specified
-        if (coupon?.maximumDiscount && discountAmount > coupon?.maximumDiscount) {
-          discountAmount = coupon.maximumDiscount;
+        if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
+          discountAmount = coupon.maxDiscount;
         }
-      } else {
+      } else if (coupon) {
         // Fixed amount discount
-        discountAmount = coupon?.discountValue;
+        discountAmount = coupon.value;
         
         // Ensure discount doesn't exceed order total
         if (discountAmount > itemsPrice) {
           discountAmount = itemsPrice;
         }
+      } else {
+        // No valid coupon
+        discountAmount = 0;
       }
       
-      couponId = coupon._id;
+      // Set coupon ID only if coupon exists
+      if (coupon && coupon._id) {
+        couponId = coupon._id;
+      }
     }
     
     // Calculate prices
@@ -179,8 +184,14 @@ exports.createOrder = async (req, res, next) => {
     // Calculate shipping price (free shipping over $100)
     const shippingPrice = itemsPrice > 100 ? 0 : 10;
     
-    // Calculate total price
-    const totalPrice = parseFloat((itemsPrice + taxPrice + shippingPrice - discountAmount).toFixed(2));
+    // Ensure all numbers are valid
+    const validItemsPrice = isNaN(itemsPrice) ? 0 : itemsPrice;
+    const validTaxPrice = isNaN(taxPrice) ? 0 : taxPrice;
+    const validShippingPrice = isNaN(shippingPrice) ? 0 : shippingPrice;
+    const validDiscountAmount = isNaN(discountAmount) ? 0 : discountAmount;
+    
+    // Calculate total price with safety checks
+    const totalPrice = parseFloat((validItemsPrice + validTaxPrice + validShippingPrice - validDiscountAmount).toFixed(2));
     
     // Generate unique tracking number
     const generateTrackingNumber = () => {
@@ -233,9 +244,9 @@ exports.createOrder = async (req, res, next) => {
 };
 
 /**
- * @desc    Get all orders
- * @route   GET /api/orders
- * @access  Private (Admin/Vendor)
+ * @desc    Get all orders (Admin)
+ * @route   GET /api/orders/admin
+ * @access  Private (Admin)
  */
 exports.getOrders = async (req, res, next) => {
   try {
@@ -243,17 +254,82 @@ exports.getOrders = async (req, res, next) => {
     const queryObj = { ...req.query };
     
     // Fields to exclude from filtering
-    const excludedFields = ['page', 'sort', 'limit', 'fields'];
+    const excludedFields = ['page', 'sort', 'limit', 'fields', 'search', 'startDate', 'endDate', 'minAmount', 'maxAmount'];
     excludedFields.forEach(field => delete queryObj[field]);
     
-    // Filter by vendor if vendor role
-    if (req.user.role === 'vendor') {
-      // Get products owned by vendor
-      const vendorProducts = await Product.find({ seller: req.user.id }).select('_id');
-      const productIds = vendorProducts.map(p => p._id);
+    // Filter by status if provided
+    if (req.query.status) {
+      queryObj.status = req.query.status;
+    }
+    
+    // Date range filter
+    if (req.query.startDate || req.query.endDate) {
+      queryObj.createdAt = {};
       
-      // Filter orders containing vendor's products
-      queryObj['items.product'] = { $in: productIds };
+      if (req.query.startDate) {
+        queryObj.createdAt.$gte = new Date(req.query.startDate);
+        // Set time to beginning of day
+        queryObj.createdAt.$gte.setHours(0, 0, 0, 0);
+      }
+      
+      if (req.query.endDate) {
+        queryObj.createdAt.$lte = new Date(req.query.endDate);
+        // Set time to end of day
+        queryObj.createdAt.$lte.setHours(23, 59, 59, 999);
+      }
+    }
+    
+    // Amount range filter
+    if (req.query.minAmount || req.query.maxAmount) {
+      queryObj.totalPrice = {};
+      
+      if (req.query.minAmount) {
+        queryObj.totalPrice.$gte = parseFloat(req.query.minAmount);
+      }
+      
+      if (req.query.maxAmount) {
+        queryObj.totalPrice.$lte = parseFloat(req.query.maxAmount);
+      }
+    }
+    
+    // Search functionality
+    if (req.query.search) {
+      const searchRegex = new RegExp(req.query.search, 'i');
+      
+      // First, find users that match the search term
+      const users = await User.find({
+        $or: [
+          { name: searchRegex },
+          { email: searchRegex }
+        ]
+      }).select('_id');
+      
+      const userIds = users.map(user => user._id);
+      
+      // Check if search might be for an order ID
+      const orderIdMatch = req.query.search.match(/^[a-f\d]{24}$/i) ? 
+        { _id: req.query.search } : {};
+      
+      // Check if search might be for a tracking number
+      const trackingNumberMatch = { trackingNumber: searchRegex };
+      
+      // Combine all search conditions
+      const searchConditions = [
+        { 'items.name': searchRegex },
+        { user: { $in: userIds } },
+        orderIdMatch,
+        trackingNumberMatch
+      ];
+      
+      // If original query had other conditions, we need to combine them with the search
+      if (Object.keys(queryObj).length > 0) {
+        queryObj.$and = [
+          { $or: searchConditions },
+          { ...queryObj }
+        ];
+      } else {
+        queryObj.$or = searchConditions;
+      }
     }
     
     // Pagination
@@ -261,7 +337,7 @@ exports.getOrders = async (req, res, next) => {
     const limit = parseInt(req.query.limit, 10) || 10;
     const startIndex = (page - 1) * limit;
     
-    // Execute query
+    // Execute query with population
     let query = Order.find(queryObj)
       .populate({
         path: 'user',
@@ -271,15 +347,9 @@ exports.getOrders = async (req, res, next) => {
       .limit(limit)
       .sort(req.query.sort || '-createdAt');
     
-    // Select specific fields if requested
-    if (req.query.fields) {
-      const fields = req.query.fields.split(',').join(' ');
-      query = query.select(fields);
-    }
-    
     const orders = await query;
     
-    // Get total count
+    // Get total count for pagination
     const total = await Order.countDocuments(queryObj);
     
     // Pagination result
@@ -295,8 +365,8 @@ exports.getOrders = async (req, res, next) => {
       count: orders.length,
       data: orders
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 };
 
@@ -818,7 +888,7 @@ exports.getOrderAnalytics = async (req, res, next) => {
             $sum: {
               $cond: [
                 { $ne: ['$status', 'cancelled'] },
-                '$totalAmount',
+                '$totalPrice',
                 0
               ]
             }
@@ -845,7 +915,7 @@ exports.getOrderAnalytics = async (req, res, next) => {
             month: { $month: '$createdAt' },
             day: { $dayOfMonth: '$createdAt' }
           },
-          revenue: { $sum: '$totalAmount' },
+          revenue: { $sum: '$totalPrice' },
           count: { $sum: 1 }
         }
       },
@@ -902,7 +972,7 @@ exports.getOrderAnalytics = async (req, res, next) => {
     // Calculate total revenue (excluding cancelled orders)
     const totalRevenue = await Order.aggregate([
       { $match: { status: { $ne: 'cancelled' } } },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      { $group: { _id: null, total: { $sum: '$totalPrice' } } }
     ]);
     
     // Get orders created today
@@ -921,7 +991,7 @@ exports.getOrderAnalytics = async (req, res, next) => {
           status: { $ne: 'cancelled' }
         } 
       },
-      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+      { $group: { _id: null, total: { $sum: '$totalPrice' } } }
     ]);
     
     res.status(200).json({

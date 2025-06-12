@@ -48,14 +48,14 @@ exports.getReviews = async (req, res, next) => {
     }
     
     // Filter by approved reviews for public access
-    if (!req.user) {
-      queryObj.isApproved = true;
-      queryObj.isRejected = false;
-    } else if (req.user && req.user.role !== 'admin') {
-      // For authenticated non-admin users, only show approved reviews
-      queryObj.isApproved = true;
-      queryObj.isRejected = false;
-    }
+    // if (!req.user) {
+    //   queryObj.isApproved = true;
+    //   queryObj.isRejected = false;
+    // } else if (req.user && req.user.role !== 'admin') {
+    //   // For authenticated non-admin users, only show approved reviews
+    //   queryObj.isApproved = true;
+    //   queryObj.isRejected = false;
+    // }
     // Admin users will see all reviews regardless of status
 
     // Pagination

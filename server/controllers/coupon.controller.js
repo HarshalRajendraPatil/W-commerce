@@ -13,7 +13,7 @@ exports.getCoupons = async (req, res) => {
     const queryObj = { ...req.query };
     
     // Fields to exclude from filtering
-    const excludedFields = ['page', 'sort', 'limit', 'fields', 'search'];
+    const excludedFields = ['page', 'sort', 'limit', 'fields', 'search', 'minValue', 'maxValue', 'minUsage', 'maxUsage', 'startDate', 'endDate'];
     excludedFields.forEach(field => delete queryObj[field]);
     
     // Search functionality
@@ -33,6 +33,49 @@ exports.getCoupons = async (req, res) => {
     // Filter by type if provided
     if (req.query.type) {
       queryObj.type = req.query.type;
+    }
+    
+    // Value range filters
+    if (req.query.minValue || req.query.maxValue) {
+      queryObj.value = {};
+      
+      if (req.query.minValue) {
+        queryObj.value.$gte = parseFloat(req.query.minValue);
+      }
+      
+      if (req.query.maxValue) {
+        queryObj.value.$lte = parseFloat(req.query.maxValue);
+      }
+    }
+    
+    // Usage count range filters
+    if (req.query.minUsage || req.query.maxUsage) {
+      queryObj.usageCount = {};
+      
+      if (req.query.minUsage) {
+        queryObj.usageCount.$gte = parseInt(req.query.minUsage);
+      }
+      
+      if (req.query.maxUsage) {
+        queryObj.usageCount.$lte = parseInt(req.query.maxUsage);
+      }
+    }
+    
+    // Date range filters for expiry date
+    if (req.query.startDate || req.query.endDate) {
+      queryObj.endDate = {};
+      
+      if (req.query.startDate) {
+        queryObj.endDate.$gte = new Date(req.query.startDate);
+        // Set time to beginning of day
+        queryObj.endDate.$gte.setHours(0, 0, 0, 0);
+      }
+      
+      if (req.query.endDate) {
+        queryObj.endDate.$lte = new Date(req.query.endDate);
+        // Set time to end of day
+        queryObj.endDate.$lte.setHours(23, 59, 59, 999);
+      }
     }
     
     // Pagination
@@ -271,7 +314,7 @@ exports.getCouponAnalytics = async (req, res) => {
     // Get total discount amount from orders
     const orders = await Order.find({ coupon: { $exists: true, $ne: null } });
     const totalDiscountAmount = orders.reduce((total, order) => total + (order.discountAmount || 0), 0);
-    
+
     // Get monthly coupon usage
     const monthlyCouponUsage = await Order.aggregate([
       { $match: { coupon: { $exists: true, $ne: null } } },
@@ -484,7 +527,7 @@ exports.applyCoupon = async (req, res) => {
     
     // Apply coupon to cart
     cart.coupon = coupon._id;
-    cart.discountAmount = validationResult.discount;
+    cart.discountAmount = validationResult.discount?.toFixed(2);
     
     await cart.save();
     

@@ -19,7 +19,7 @@ const Reviews = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [actionLoading, setActionLoading] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true); // Show filters by default
   const [rejectionReason, setRejectionReason] = useState('');
   const [reviewToReject, setReviewToReject] = useState(null);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
@@ -36,27 +36,12 @@ const Reviews = () => {
     monthlyMetrics: [],
     topReviewedProducts: []
   });
-
-  console.log(reviews);
   
-  // Load reviews on component mount and when filter/page changes
-  useEffect(() => {
-    loadReviews();
-  }, [dispatch, filter, currentPage, itemsPerPage]);
-  
-  // Load analytics data
+  // Load analytics data only once on component mount
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        // Load all reviews initially without filters
-        await dispatch(getReviews({
-          page: 1,
-          limit: itemsPerPage,
-          // No status filters to ensure all reviews are fetched
-        })).unwrap();
-        
         const result = await dispatch(getReviewAnalyticsOverview()).unwrap();
-        console.log(result);
         setAnalyticsData(result.data);
       } catch (err) {
         toast.error('Failed to load review analytics');
@@ -64,7 +49,12 @@ const Reviews = () => {
     };
     
     fetchAnalytics();
-  }, [dispatch, itemsPerPage]);
+  }, [dispatch]);
+  
+  // Load reviews on component mount and when filter/page changes
+  useEffect(() => {
+    loadReviews();
+  }, [dispatch, currentPage, itemsPerPage]);
   
   // Handle success and error messages
   useEffect(() => {
@@ -76,28 +66,24 @@ const Reviews = () => {
     }
   }, [success, successMessage, error]);
   
-  // Add debounce to search
+  // Add debounce to search and filters
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchTerm !== '') {
-        setCurrentPage(1);
-        loadReviews();
-      }
-    }, 500);
+      setCurrentPage(1);
+      loadReviews();
+    }, 300);
     
     return () => clearTimeout(timer);
-  }, [searchTerm]);
-  
-  // Reset page when filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filter, verifiedOnly, ratingFilter]);
+  }, [searchTerm, filter, verifiedOnly, ratingFilter]);
 
   // At the beginning of the component, add check for empty reviews
   const filteredReviews = reviews || [];
   
   const loadReviews = async () => {
     try {
+      // Don't send a request if there's nothing to show
+      if (loading) return;
+      
       // Prepare query parameters
       const params = {
         page: currentPage,
@@ -139,18 +125,40 @@ const Reviews = () => {
   
   const handleSearch = (e) => {
     e.preventDefault();
-    setCurrentPage(1); // Reset to first page
-    loadReviews();
+    // The search is already triggered by the useEffect that watches searchTerm
+    // This just prevents the form from submitting
   };
   
   const handleApprove = async (reviewId) => {
     try {
       setActionLoading(true);
-      await dispatch(approveReview(reviewId)).unwrap();
-      toast.success('Review approved successfully');
-      loadReviews();
-      // Reload analytics
-      dispatch(getReviewAnalyticsOverview());
+      const result = await dispatch(approveReview(reviewId)).unwrap();
+      
+      // Update local analyticsData without making another API call
+      if (result.data && analyticsData.overallMetrics) {
+        const metrics = {...analyticsData.overallMetrics};
+        
+        // Update the metrics based on previous status
+        const review = reviews.find(r => r._id === reviewId);
+        if (review) {
+          if (!review.isApproved && !review.isRejected) {
+            // If it was pending, decrement pending count and increment approved count
+            metrics.pendingReviews = Math.max(0, metrics.pendingReviews - 1);
+            metrics.approvedReviews += 1;
+          } else if (review.isRejected) {
+            // If it was rejected, decrement rejected count and increment approved count
+            metrics.rejectedReviews = Math.max(0, metrics.rejectedReviews - 1);
+            metrics.approvedReviews += 1;
+          }
+          
+          setAnalyticsData({
+            ...analyticsData,
+            overallMetrics: metrics
+          });
+        }
+        
+        toast.success('Review approved successfully');
+      }
     } catch (err) {
       toast.error(err || 'Failed to approve review');
     } finally {
@@ -171,16 +179,36 @@ const Reviews = () => {
     
     try {
       setActionLoading(true);
-      await dispatch(rejectReview({ 
+      const result = await dispatch(rejectReview({ 
         reviewId: reviewToReject._id, 
         rejectionReason 
       })).unwrap();
       
-      toast.success('Review rejected successfully');
-      setReviewToReject(null);
-      loadReviews();
-      // Reload analytics
-      dispatch(getReviewAnalyticsOverview());
+      // Update local analyticsData without making another API call
+      if (result.data && analyticsData.overallMetrics) {
+        const metrics = {...analyticsData.overallMetrics};
+        
+        // Update the metrics based on previous status
+        if (!reviewToReject.isRejected) {
+          if (reviewToReject.isApproved) {
+            // If it was approved, decrement approved count and increment rejected count
+            metrics.approvedReviews = Math.max(0, metrics.approvedReviews - 1);
+            metrics.rejectedReviews += 1;
+          } else {
+            // If it was pending, decrement pending count and increment rejected count
+            metrics.pendingReviews = Math.max(0, metrics.pendingReviews - 1);
+            metrics.rejectedReviews += 1;
+          }
+          
+          setAnalyticsData({
+            ...analyticsData,
+            overallMetrics: metrics
+          });
+        }
+        
+        toast.success('Review rejected successfully');
+        setReviewToReject(null);
+      }
     } catch (err) {
       toast.error(err || 'Failed to reject review');
     } finally {
@@ -223,18 +251,6 @@ const Reviews = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-gray-900">Reviews</h1>
-        <div>
-          <select 
-            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
-            <option value="all">All Reviews</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
       </div>
       
       {/* Stats Cards */}
@@ -347,10 +363,46 @@ const Reviews = () => {
           <div className="bg-gray-50 p-4 rounded-md mt-2">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
+                <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                  Review Status
+                </label>
+                <select 
+                  id="status-filter"
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                >
+                  <option value="all">All Reviews</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+            
+              <div>
+                <label htmlFor="rating-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                  Rating
+                </label>
+                <select
+                  id="rating-filter"
+                  value={ratingFilter}
+                  onChange={(e) => setRatingFilter(e.target.value)}
+                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                >
+                  <option value="">All Ratings</option>
+                  <option value="5">5 Stars</option>
+                  <option value="4">4 Stars</option>
+                  <option value="3">3 Stars</option>
+                  <option value="2">2 Stars</option>
+                  <option value="1">1 Star</option>
+                </select>
+              </div>
+
+              <div>
                 <label htmlFor="verified-filter" className="block text-sm font-medium text-gray-700 mb-1">
                   Purchase Verification
                 </label>
-                <div className="flex items-center">
+                <div className="flex items-center mt-2">
                   <input
                     id="verified-filter"
                     type="checkbox"
@@ -364,26 +416,7 @@ const Reviews = () => {
                 </div>
               </div>
 
-              <div>
-                <label htmlFor="rating-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Rating
-                </label>
-                <select
-                  id="rating-filter"
-                  value={ratingFilter}
-                  onChange={(e) => setRatingFilter(e.target.value)}
-                  className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                >
-                  <option value="">All Ratings</option>
-                  <option value="5">5 Stars</option>
-                  <option value="4">4 Stars</option>
-                  <option value="3">3 Stars</option>
-                  <option value="2">2 Stars</option>
-                  <option value="1">1 Star</option>
-                </select>
-              </div>
-
-              <div className="flex items-end">
+              <div className="flex items-end md:col-start-3">
                 <button
                   onClick={() => {
                     setVerifiedOnly(false);
@@ -393,7 +426,7 @@ const Reviews = () => {
                     setCurrentPage(1);
                     loadReviews();
                   }}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 font-medium text-sm"
+                  className="px-4 py-2 bg-gray-100 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-200 font-medium text-sm"
                 >
                   Clear Filters
                 </button>

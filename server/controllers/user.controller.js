@@ -213,18 +213,20 @@ exports.deleteUser = async (req, res) => {
  */
 exports.getUserAnalytics = async (req, res) => {
   try {
-    // Get total user count
+    // Get total users count
     const totalUsers = await User.countDocuments();
     
-    // Get new users in the last 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const newUsers = await User.countDocuments({
-      createdAt: { $gte: thirtyDaysAgo }
-    });
+    // Get active users count
+    const activeUsers = await User.countDocuments({ active: true });
     
-    // Get user count by role
-    const roleDistribution = await User.aggregate([
+    // Get inactive users count
+    const inactiveUsers = await User.countDocuments({ active: false });
+    
+    // Get total orders count
+    const totalOrders = await Order.countDocuments();
+    
+    // Get users by role
+    const usersByRole = await User.aggregate([
       {
         $group: {
           _id: '$role',
@@ -233,43 +235,83 @@ exports.getUserAnalytics = async (req, res) => {
       }
     ]);
     
-    // Get users by month for the last year
-    const lastYear = new Date();
-    lastYear.setFullYear(lastYear.getFullYear() - 1);
+    // Get users by registration month (last 6 months)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
     
     const usersByMonth = await User.aggregate([
-      { $match: { createdAt: { $gte: lastYear } } },
+      {
+        $match: {
+          createdAt: { $gte: sixMonthsAgo }
+        }
+      },
       {
         $group: {
-          _id: { 
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' }
+          _id: {
+            month: { $month: '$createdAt' },
+            year: { $year: '$createdAt' }
           },
           count: { $sum: 1 }
         }
       },
-      { $sort: { '_id.year': 1, '_id.month': 1 } }
+      {
+        $sort: { '_id.year': 1, '_id.month': 1 }
+      }
     ]);
     
-    // Format data for frontend
-    const formattedUsersByMonth = usersByMonth.map(item => ({
-      date: `${item._id.year}-${String(item._id.month).padStart(2, '0')}`,
-      users: item.count
-    }));
+    // Get top customers by order count
+    const topCustomers = await Order.aggregate([
+      {
+        $group: {
+          _id: '$user',
+          orderCount: { $sum: 1 },
+          totalSpent: { $sum: '$totalPrice' }
+        }
+      },
+      {
+        $sort: { orderCount: -1 }
+      },
+      {
+        $limit: 5
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user'
+        }
+      },
+      {
+        $unwind: '$user'
+      },
+      {
+        $project: {
+          _id: '$user._id',
+          name: '$user.name',
+          email: '$user.email',
+          orderCount: 1,
+          totalSpent: 1
+        }
+      }
+    ]);
     
-    // Format role distribution
-    const formattedRoleDistribution = roleDistribution.reduce((acc, item) => {
-      acc[item._id] = item.count;
-      return acc;
-    }, {});
+    // Format user roles data for easier consumption
+    const roleData = {};
+    usersByRole.forEach(role => {
+      roleData[role._id] = role.count;
+    });
     
     res.status(200).json({
       success: true,
       data: {
         totalUsers,
-        newUsers,
-        roleDistribution: formattedRoleDistribution,
-        usersByMonth: formattedUsersByMonth
+        activeUsers,
+        inactiveUsers,
+        totalOrders,
+        usersByRole: roleData,
+        usersByMonth,
+        topCustomers
       }
     });
   } catch (error) {

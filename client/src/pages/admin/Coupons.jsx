@@ -1,26 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { format } from 'date-fns';
-import { fetchCoupons, deleteCoupon, createCoupon, updateCoupon, fetchCouponAnalytics, fetchCouponStats } from '../../redux/slices/couponSlice';
+import { fetchCoupons, deleteCoupon, createCoupon, updateCoupon, fetchCouponStats, fetchCouponAnalytics } from '../../redux/slices/couponSlice';
 import { toast } from 'react-toastify';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
-import { Bar, Doughnut } from 'react-chartjs-2';
-import ChartWrapper from '../../components/ChartWrapper';
+import CouponStatsModal from '../../components/admin/CouponStatsModal';
+import { FiTag, FiPercent, FiDollarSign, FiFilter, FiSearch, FiCalendar, FiChevronDown, FiChevronUp, FiUsers, FiClock, FiCheck } from 'react-icons/fi';
+import Loader from '../../components/common/Loader';
+import SkeletonLoader from '../../components/common/SkeletonLoader';
 
-// Register required Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
+
 
 const Coupons = () => {
   const dispatch = useDispatch();
-  const { coupons, pagination, loading, error } = useSelector((state) => state.coupon);
+  const { coupons, pagination, loading, error, couponAnalytics } = useSelector((state) => state.coupon);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentCoupon, setCurrentCoupon] = useState(null);
@@ -28,10 +21,16 @@ const Coupons = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [analytics, setAnalytics] = useState(null);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [selectedCoupon, setSelectedCoupon] = useState(null);
   const [couponStats, setCouponStats] = useState(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [minValue, setMinValue] = useState('');
+  const [maxValue, setMaxValue] = useState('');
+  const [minUsage, setMinUsage] = useState('');
+  const [maxUsage, setMaxUsage] = useState('');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   
   // Form state
   const [formData, setFormData] = useState({
@@ -48,8 +47,8 @@ const Coupons = () => {
     perUserLimit: 0
   });
   
-  // Load coupons on component mount and when filters change
-  useEffect(() => {
+  // Function to load coupons with all current filters
+  const loadCoupons = () => {
     const params = {
       page: currentPage,
       limit: 10,
@@ -68,100 +67,81 @@ const Coupons = () => {
       params.isActive = statusFilter === 'active';
     }
     
-    dispatch(fetchCoupons(params));
-  }, [dispatch, currentPage, searchTerm, typeFilter, statusFilter]);
+    if (minValue) params.minValue = minValue;
+    if (maxValue) params.maxValue = maxValue;
+    if (minUsage) params.minUsage = minUsage;
+    if (maxUsage) params.maxUsage = maxUsage;
+    if (startDateFilter) params.startDate = startDateFilter;
+    if (endDateFilter) params.endDate = endDateFilter;
+    
+          dispatch(fetchCoupons(params));
+    };
   
-  // Fetch coupon analytics on component mount
+  // Load coupons when page changes
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const result = await dispatch(fetchCouponAnalytics()).unwrap();
-        setAnalytics(result.data);
-      } catch (error) {
-        toast.error('Failed to fetch coupon analytics');
+    loadCoupons();
+  }, [dispatch, currentPage]);
+  
+  // Add debounce for filters to reduce API calls
+  useEffect(() => {
+    if (loading) return; // Don't send requests while loading
+    
+    const timer = setTimeout(() => {
+      setCurrentPage(1); // Reset to first page when filters change
+      loadCoupons();
+    }, 400);
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm, typeFilter, statusFilter, minValue, maxValue, minUsage, maxUsage, startDateFilter, endDateFilter]);
+  
+  // Fetch analytics data only once when component mounts
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      if (!couponAnalytics) {
+        setAnalyticsLoading(true);
+        try {
+          await dispatch(fetchCouponAnalytics()).unwrap();
+        } catch (error) {
+          toast.error('Failed to load coupon analytics');
+        } finally {
+          setAnalyticsLoading(false);
+        }
       }
     };
-
-    fetchAnalytics();
-  }, [dispatch]);
-  
-  // Create refs for chart data to prevent unnecessary re-renders
-  const distributionChartData = useRef(null);
-  const statusChartData = useRef(null);
-  
-  // Prepare chart data when analytics are available
-  const getChartData = () => {
-    if (!analytics) return null;
     
-    // Only recalculate if the data has changed or hasn't been calculated yet
-    if (!distributionChartData.current) {
-      distributionChartData.current = {
-        labels: ['Active', 'Expired', 'Percentage', 'Fixed'],
-        datasets: [{
-          label: 'Coupon Distribution',
-          data: [
-            analytics.activeCoupons,
-            analytics.expiredCoupons,
-            analytics.couponsByType?.percentage || 0,
-            analytics.couponsByType?.fixed || 0
-          ],
-          backgroundColor: [
-            'rgba(75, 192, 192, 0.6)',
-            'rgba(255, 99, 132, 0.6)',
-            'rgba(54, 162, 235, 0.6)',
-            'rgba(255, 206, 86, 0.6)'
-          ],
-          borderColor: [
-            'rgba(75, 192, 192, 1)',
-            'rgba(255, 99, 132, 1)',
-            'rgba(54, 162, 235, 1)',
-            'rgba(255, 206, 86, 1)'
-          ],
-          borderWidth: 1
-        }]
-      };
-    }
-    
-    return distributionChartData.current;
-  };
+    fetchAnalyticsData();
+  }, [dispatch, couponAnalytics]);
   
-  const getStatusChartData = () => {
-    if (!analytics) return null;
+  // Memoized stats calculations to avoid recalculating on every render
+  const stats = useMemo(() => {
+    if (!couponAnalytics) return null;
     
-    // Only recalculate if the data has changed or hasn't been calculated yet
-    if (!statusChartData.current) {
-      statusChartData.current = {
-        labels: ['Active', 'Expired'],
-        datasets: [{
-          data: [analytics.activeCoupons, analytics.expiredCoupons],
-          backgroundColor: [
-            'rgba(75, 192, 192, 0.6)',
-            'rgba(255, 99, 132, 0.6)'
-          ],
-          borderColor: [
-            'rgba(75, 192, 192, 1)',
-            'rgba(255, 99, 132, 1)'
-          ],
-          borderWidth: 1
-        }]
-      };
-    }
-    
-    return statusChartData.current;
-  };
-  
-  // Reset chart data refs when analytics change
-  useEffect(() => {
-    if (analytics) {
-      distributionChartData.current = null;
-      statusChartData.current = null;
-    }
-  }, [analytics]);
+    const activePercentage = couponAnalytics.totalCoupons > 0 
+      ? ((couponAnalytics.activeCoupons / couponAnalytics.totalCoupons) * 100).toFixed(0)
+      : 0;
+      
+    const expiredPercentage = couponAnalytics.totalCoupons > 0
+      ? ((couponAnalytics.expiredCoupons / couponAnalytics.totalCoupons) * 100).toFixed(0)
+      : 0;
+      
+    return {
+      totalCoupons: couponAnalytics.totalCoupons || 0,
+      activeCoupons: couponAnalytics.activeCoupons || 0,
+      expiredCoupons: couponAnalytics.expiredCoupons || 0,
+      totalDiscountAmount: couponAnalytics.totalDiscountAmount?.toFixed(2) || 0,
+      mostUsedCoupons: couponAnalytics.mostUsedCoupons || [],
+      activePercentage,
+      expiredPercentage,
+      percentageCoupons: couponAnalytics.couponsByType?.percentage || 0,
+      fixedCoupons: couponAnalytics.couponsByType?.fixed || 0
+    };
+  }, [couponAnalytics]);
   
   // Handle search
   const handleSearch = (e) => {
     e.preventDefault();
-    setCurrentPage(1); // Reset to first page when searching
+    // The search is handled by the debounced useEffect
+    // Just prevent the form from submitting
   };
   
   // Handle page change
@@ -266,29 +246,23 @@ const Coupons = () => {
           couponData
         })).unwrap();
         
-        toast.success(`Coupon ${couponData.code} updated successfully`);
+        // No toast here as the slice already shows a toast
       } else {
         // Create new coupon
-        const result = await dispatch(createCoupon(couponData)).unwrap();
+        await dispatch(createCoupon(couponData)).unwrap();
         
-        toast.success(`Coupon ${couponData.code} created successfully`);
+        // No toast here as the slice already shows a toast
       }
       
-      // Close modal and refresh list
+      // Close modal
       setIsModalOpen(false);
       
-      // Refresh coupon list with all current filters applied
-      dispatch(fetchCoupons({
-        page: currentPage,
-        limit: 10,
-        sort: '-createdAt',
-        search: searchTerm,
-        type: typeFilter,
-        isActive: statusFilter === 'active' ? true : (statusFilter === 'inactive' ? false : undefined)
-      }));
+      // No need to refresh the list manually - the createCoupon/updateCoupon actions already update the state
       
-      // Also refresh analytics
-      dispatch(fetchCouponAnalytics());
+      // Refresh analytics after a short delay to ensure server has processed the change
+      setTimeout(() => {
+        dispatch(fetchCouponAnalytics());
+      }, 500);
     } catch (error) {
       toast.error(`Error: ${error}`);
     }
@@ -298,28 +272,23 @@ const Coupons = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this coupon? This action cannot be undone.')) {
       try {
+        const coupon = coupons.find(c => c._id === id);
         await dispatch(deleteCoupon(id)).unwrap();
         
         // If deleting the last coupon on a page, go to previous page
-        const coupon = coupons.find(c => c._id === id);
         if (coupons.length === 1 && currentPage > 1) {
           setCurrentPage(currentPage - 1);
-        } else {
-          // Just refresh the current page
-          dispatch(fetchCoupons({
-            page: currentPage,
-            limit: 10,
-            sort: '-createdAt',
-            search: searchTerm,
-            type: typeFilter,
-            isActive: statusFilter === 'active' ? true : (statusFilter === 'inactive' ? false : undefined)
-          }));
-        }
+        } 
+        // No need to refresh manually - the deleteCoupon action already updates the state
         
-        // Also refresh analytics
-        dispatch(fetchCouponAnalytics());
+        // Only refresh analytics if we've deleted a coupon
+        const analyticsTimer = setTimeout(() => {
+          dispatch(fetchCouponAnalytics());
+        }, 500);
         
         toast.success(`Coupon ${coupon?.code || ''} deleted successfully`);
+        
+        return () => clearTimeout(analyticsTimer);
       } catch (error) {
         toast.error(`Failed to delete coupon: ${error}`);
       }
@@ -330,18 +299,49 @@ const Coupons = () => {
   const viewCouponStats = async (couponId) => {
     try {
       const coupon = coupons.find(c => c._id === couponId);
-      if (!coupon) return;
-
+      if (!coupon) {
+        toast.error('Coupon not found');
+        return;
+      }
+      
+      // Set coupon and open modal immediately for better UX
       setSelectedCoupon(coupon);
       setCouponStats(null); // Reset stats while loading
       setIsStatsModalOpen(true);
       
+      // Fetch stats and explicitly update the local state for immediate display
       const result = await dispatch(fetchCouponStats(couponId)).unwrap();
-      setCouponStats(result.data);
+      if (result && result.data) {
+        setCouponStats(result.data);
+        console.log('Coupon stats loaded:', result.data);
+      } else {
+        toast.warning('No stats available for this coupon');
+        // Provide empty stats object to avoid null reference errors
+        setCouponStats({
+          usageCount: 0,
+          totalDiscountAmount: 0,
+          averageOrderValue: 0
+        });
+      }
     } catch (error) {
+      console.error('Error fetching coupon stats:', error);
       toast.error('Failed to fetch coupon stats');
       setIsStatsModalOpen(false);
     }
+  };
+  
+  // Add a reset filters function
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setTypeFilter('');
+    setStatusFilter('');
+    setMinValue('');
+    setMaxValue('');
+    setMinUsage('');
+    setMaxUsage('');
+    setStartDateFilter('');
+    setEndDateFilter('');
+    setCurrentPage(1);
   };
   
   return (
@@ -356,52 +356,240 @@ const Coupons = () => {
         </button>
       </div>
       
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
-        <div className="w-full sm:w-1/3">
-          <form onSubmit={handleSearch} className="flex">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search coupons..."
-              className="border border-gray-300 rounded-l-md px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <button
-              type="submit"
-              className="bg-indigo-600 text-white px-4 py-2 rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      {/* Enhanced Stats Cards */}
+      {analyticsLoading ? (
+        <SkeletonLoader.StatCard count={4} />
+      ) : !stats ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-blue-100 text-blue-800">
+                <FiTag className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Total Coupons</h3>
+                <p className="text-2xl font-bold mt-1">{pagination?.count || 0}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-green-100 text-green-800">
+                <FiPercent className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Active Filters</h3>
+                <p className="text-lg font-bold mt-1">
+                  {[
+                    typeFilter && 'Type',
+                    statusFilter && 'Status',
+                    minValue && 'Min Value',
+                    maxValue && 'Max Value'
+                  ].filter(Boolean).join(', ') || 'None'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-blue-100 text-blue-800">
+                <FiTag className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Total Coupons</h3>
+                <p className="text-2xl font-bold mt-1">{stats.totalCoupons}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-green-100 text-green-800">
+                <FiCheck className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Active Coupons</h3>
+                <p className="text-2xl font-bold mt-1">{stats.activeCoupons} <span className="text-sm text-gray-500 font-normal">({stats.activePercentage}%)</span></p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-red-100 text-red-800">
+                <FiClock className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Expired Coupons</h3>
+                <p className="text-2xl font-bold mt-1">{stats.expiredCoupons} <span className="text-sm text-gray-500 font-normal">({stats.expiredPercentage}%)</span></p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-md shadow border border-gray-100">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-purple-100 text-purple-800">
+                <FiDollarSign className="h-6 w-6" />
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500">Total Savings</h3>
+                <p className="text-2xl font-bold mt-1">${stats.totalDiscountAmount}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Replace the Filters section with this enhanced version */}
+      <div className="bg-white p-4 rounded-md shadow">
+        <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+          <div className="w-full sm:w-1/3">
+            <form onSubmit={handleSearch} className="flex">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by code or description..."
+                className="border border-gray-300 rounded-l-md px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <button
+                type="submit"
+                className="bg-indigo-600 text-white px-4 py-2 rounded-r-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <FiSearch className="h-5 w-5" />
+              </button>
+            </form>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              Search
+              <option value="">All Types</option>
+              <option value="percentage">Percentage</option>
+              <option value="fixed">Fixed Amount</option>
+            </select>
+            
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="flex items-center px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50"
+            >
+              <FiFilter className="mr-2 h-4 w-4" />
+              {showAdvancedFilters ? 'Hide Filters' : 'Advanced Filters'}
+              {showAdvancedFilters ? <FiChevronUp className="ml-1 h-4 w-4" /> : <FiChevronDown className="ml-1 h-4 w-4" />}
             </button>
-          </form>
+          </div>
         </div>
         
-        <div className="flex items-center space-x-4">
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">All Types</option>
-            <option value="percentage">Percentage</option>
-            <option value="fixed">Fixed Amount</option>
-          </select>
-          
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-        </div>
+        {showAdvancedFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Discount Value Range</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min Value"
+                    value={minValue}
+                    onChange={(e) => setMinValue(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max Value"
+                    value={maxValue}
+                    onChange={(e) => setMaxValue(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Usage Count Range</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min Usage"
+                    value={minUsage}
+                    onChange={(e) => setMinUsage(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max Usage"
+                    value={maxUsage}
+                    onChange={(e) => setMaxUsage(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date Range</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={startDateFilter}
+                    onChange={(e) => setStartDateFilter(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <input
+                    type="date"
+                    value={endDateFilter}
+                    onChange={(e) => setEndDateFilter(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="md:col-span-3 flex justify-end space-x-4">
+                <button
+                  onClick={handleResetFilters}
+                  className="px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50"
+                >
+                  Reset Filters
+                </button>
+                
+                <button
+                  onClick={() => openModal()}
+                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 font-medium shadow-sm flex items-center"
+                >
+                  <svg className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add New Coupon
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       {loading ? (
-        <div className="text-center py-4">
-          <p className="text-gray-500">Loading coupons...</p>
+        <div className="bg-white shadow overflow-hidden sm:rounded-md mt-4">
+          <SkeletonLoader.TableRow columns={6} rows={5} />
         </div>
       ) : error ? (
         <div className="bg-red-50 p-4 rounded-md">
@@ -415,7 +603,7 @@ const Coupons = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Code
+                    Code & ID
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Discount
@@ -429,7 +617,7 @@ const Coupons = () => {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase tracking-wider bg-gray-100">
                     Actions
                   </th>
                 </tr>
@@ -440,7 +628,8 @@ const Coupons = () => {
                     <tr key={coupon._id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">{coupon.code}</div>
-                        <div className="text-xs text-gray-500">{coupon.description}</div>
+                        <div className="text-xs text-gray-500">{coupon.description.slice(0, 20)}...</div>
+                        <div className="text-xs text-gray-400 mt-1">ID: {coupon._id}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
@@ -488,14 +677,13 @@ const Coupons = () => {
                           {coupon.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-3">
+                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                        <div className="flex justify-center space-x-2">
                           <button 
                             onClick={() => viewCouponStats(coupon._id)}
-                            className="flex items-center text-blue-600 hover:text-blue-900"
-                            title="View Coupon Statistics"
+                            className="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                           >
-                            <svg className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                             </svg>
                             Stats
@@ -503,10 +691,9 @@ const Coupons = () => {
                           
                           <button 
                             onClick={() => openModal(coupon)}
-                            className="flex items-center text-indigo-600 hover:text-indigo-900"
-                            title="Edit Coupon"
+                            className="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-xs font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                           >
-                            <svg className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                             Edit
@@ -514,10 +701,9 @@ const Coupons = () => {
                           
                           <button 
                             onClick={() => handleDelete(coupon._id)}
-                            className="flex items-center text-red-600 hover:text-red-900"
-                            title="Delete Coupon"
+                            className="inline-flex items-center px-3 py-2 border border-transparent shadow-sm text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                           >
-                            <svg className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
                             Delete
@@ -574,351 +760,20 @@ const Coupons = () => {
         </>
       )}
       
-      {/* Coupon Analytics Section */}
-      {analytics && (
-        <div className="bg-white shadow overflow-hidden sm:rounded-md p-6 mt-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Coupon Analytics</h2>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
-                <div className="bg-indigo-50 p-4 rounded-md border border-indigo-100">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-indigo-700">Total Coupons</h3>
-                    <svg className="h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  </div>
-                  <p className="text-2xl font-bold text-indigo-900 mt-2">{analytics.totalCoupons}</p>
-                </div>
-                
-                <div className="bg-green-50 p-4 rounded-md border border-green-100">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-green-700">Active Coupons</h3>
-                    <svg className="h-8 w-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-2xl font-bold text-green-900 mt-2">{analytics.activeCoupons}</p>
-                </div>
-                
-                <div className="bg-red-50 p-4 rounded-md border border-red-100">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-red-700">Expired Coupons</h3>
-                    <svg className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-2xl font-bold text-red-900 mt-2">{analytics.expiredCoupons}</p>
-                </div>
-                
-                <div className="bg-yellow-50 p-4 rounded-md border border-yellow-100">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium text-yellow-700">Total Discount Amount</h3>
-                    <svg className="h-8 w-8 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-2xl font-bold text-yellow-900 mt-2">${analytics.totalDiscountAmount.toFixed(2)}</p>
-                </div>
-              </div>
-              
-              {analytics.mostUsedCoupons && analytics.mostUsedCoupons.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Most Used Coupons</h3>
-                  <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-                    <ul className="divide-y divide-gray-200">
-                      {analytics.mostUsedCoupons.map(coupon => (
-                        <li key={coupon._id} className="p-4 hover:bg-gray-50">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="font-medium text-indigo-600">{coupon.code}</p>
-                              <p className="text-sm text-gray-500">{coupon.description}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-gray-900">
-                                {coupon.usedCount || 0} uses
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {coupon.type === 'percentage' ? `${coupon.value}%` : `$${coupon.value.toFixed(2)}`}
-                              </p>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="lg:col-span-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
-                <div className="bg-white p-4 rounded-md border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Coupon Distribution</h3>
-                  <div className="h-64">
-                    {analytics && (
-                      <ChartWrapper
-                        Chart={Bar}
-                        type="bar"
-                        data={getChartData()}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          scales: {
-                            y: {
-                              beginAtZero: true,
-                              ticks: {
-                                precision: 0
-                              }
-                            }
-                          }
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-                
-                <div className="bg-white p-4 rounded-md border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Coupon Status</h3>
-                  <div className="h-64 flex items-center justify-center">
-                    {analytics && (
-                      <ChartWrapper
-                        Chart={Doughnut}
-                        type="doughnut"
-                        data={getStatusChartData()}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: {
-                              position: 'bottom'
-                            }
-                          }
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      
       
       {/* Coupon Stats Modal */}
       {isStatsModalOpen && selectedCoupon && (
-        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-screen overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-semibold">Coupon Statistics</h2>
-              <button
-                onClick={() => setIsStatsModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700 focus:outline-none"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="bg-indigo-50 p-4 rounded-md mb-6">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-semibold text-indigo-900">{selectedCoupon.code}</h3>
-                  <p className="text-sm text-indigo-700">{selectedCoupon.description}</p>
-                </div>
-                <span 
-                  className={`px-3 py-1 rounded-full text-sm font-medium 
-                    ${selectedCoupon.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
-                >
-                  {selectedCoupon.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500 mb-1">Discount</h4>
-                <p className="text-lg font-semibold text-gray-900">
-                  {selectedCoupon.type === 'percentage' ? `${selectedCoupon.value}%` : `$${selectedCoupon.value.toFixed(2)}`}
-                  {selectedCoupon.type === 'percentage' && selectedCoupon.maxDiscount > 0 && 
-                    ` (Max: $${selectedCoupon.maxDiscount.toFixed(2)})`}
-                </p>
-                {selectedCoupon.minPurchase > 0 && (
-                  <p className="text-sm text-gray-600">
-                    Min purchase: ${selectedCoupon.minPurchase.toFixed(2)}
-                  </p>
-                )}
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500 mb-1">Validity</h4>
-                <p className="text-lg font-semibold text-gray-900">
-                  {format(new Date(selectedCoupon.startDate), 'PP')} - {format(new Date(selectedCoupon.endDate), 'PP')}
-                </p>
-                <p className="text-sm text-gray-600">
-                  {new Date(selectedCoupon.endDate) < new Date() 
-                    ? 'Expired' 
-                    : `Expires in ${Math.ceil((new Date(selectedCoupon.endDate) - new Date()) / (1000 * 60 * 60 * 24))} days`}
-                </p>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-200 pt-6 mb-6">
-              <h3 className="text-lg font-semibold mb-4">Usage Statistics</h3>
-              
-              {couponStats ? (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500 mb-1">Total Usage</h4>
-                      <p className="text-xl font-semibold text-gray-900">{couponStats.usageCount || 0} orders</p>
-                      {selectedCoupon.usageLimit > 0 && (
-                        <p className="text-sm text-gray-600">
-                          {selectedCoupon.usageLimit - (couponStats.usageCount || 0)} uses remaining
-                        </p>
-                      )}
-                    </div>
-                    
-                    <div className="bg-gray-50 p-4 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500 mb-1">Total Discount Amount</h4>
-                      <p className="text-xl font-semibold text-green-600">
-                        ${(couponStats.totalDiscountAmount || 0).toFixed(2)}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {couponStats.discountPercentage 
-                          ? `${couponStats.discountPercentage.toFixed(1)}% of total order value`
-                          : ''}
-                      </p>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500 mb-1">Average Discount Per Order</h4>
-                      <p className="text-xl font-semibold text-gray-900">
-                        ${couponStats.averageDiscount ? couponStats.averageDiscount.toFixed(2) : '0.00'}
-                      </p>
-                    </div>
-                    
-                    <div className="bg-gray-50 p-4 rounded-md">
-                      <h4 className="text-sm font-medium text-gray-500 mb-1">Total Order Value</h4>
-                      <p className="text-xl font-semibold text-gray-900">
-                        ${couponStats.totalOrderValue ? couponStats.totalOrderValue.toFixed(2) : '0.00'}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {couponStats.topUsers && couponStats.topUsers.length > 0 && (
-                    <div>
-                      <h4 className="text-md font-medium text-gray-700 mb-2">Top Users</h4>
-                      <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                User
-                              </th>
-                              <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Uses
-                              </th>
-                              <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Discount
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {couponStats.topUsers.map((userStat, index) => (
-                              <tr key={index}>
-                                <td className="px-4 py-2 whitespace-nowrap">
-                                  <div className="text-sm font-medium text-gray-900">{userStat.user.name}</div>
-                                  <div className="text-xs text-gray-500">{userStat.user.email}</div>
-                                </td>
-                                <td className="px-4 py-2 whitespace-nowrap text-right text-sm text-gray-900">
-                                  {userStat.count}
-                                </td>
-                                <td className="px-4 py-2 whitespace-nowrap text-right text-sm text-gray-900">
-                                  ${userStat.totalDiscount.toFixed(2)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {couponStats.recentOrders && couponStats.recentOrders.length > 0 && (
-                    <div>
-                      <h4 className="text-md font-medium text-gray-700 mb-2">Recent Orders</h4>
-                      <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-                        <table className="min-w-full divide-y divide-gray-200">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Order ID
-                              </th>
-                              <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Date
-                              </th>
-                              <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Total
-                              </th>
-                              <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Discount
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {couponStats.recentOrders.map((order, index) => (
-                              <tr key={index}>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
-                                  #{order.orderId}
-                                </td>
-                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                                  {format(new Date(order.date), 'PP')}
-                                </td>
-                                <td className="px-4 py-2 whitespace-nowrap text-right text-sm text-gray-900">
-                                  ${order.total.toFixed(2)}
-                                </td>
-                                <td className="px-4 py-2 whitespace-nowrap text-right text-sm text-green-600">
-                                  ${order.discount.toFixed(2)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">Loading stats...</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => openModal(selectedCoupon)}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Edit Coupon
-              </button>
-              <button
-                onClick={() => setIsStatsModalOpen(false)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        <CouponStatsModal 
+          coupon={selectedCoupon} 
+          stats={couponStats} 
+          onClose={() => setIsStatsModalOpen(false)} 
+        />
       )}
       
       {/* Modal for adding/editing coupons */}
       {isModalOpen && (
-        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 overflow-y-auto z-50 flex items-center justify-center bg-transparent backdrop-blur-sm shadow-lg">
           <div className="bg-white rounded-lg p-8 max-w-3xl w-full max-h-screen overflow-y-auto">
             <h2 className="text-2xl font-semibold mb-6">
               {currentCoupon ? 'Edit Coupon' : 'Add New Coupon'}
