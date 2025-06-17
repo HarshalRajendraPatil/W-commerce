@@ -12,6 +12,8 @@ router.get('/', userController.getUsers);
 router.get('/analytics', userController.getUserAnalytics);
 router.get('/:id', userController.getUser);
 router.put('/:id', userController.updateUser);
+router.put('/:id/activate', userController.activateUser);
+router.put('/:id/deactivate', userController.deactivateUser);
 router.delete('/:id', userController.deleteUser);
 
 // Add the analytics route after the other admin routes

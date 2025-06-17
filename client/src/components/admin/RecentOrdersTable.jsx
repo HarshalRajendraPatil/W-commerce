@@ -55,7 +55,7 @@ const RecentOrdersTable = ({ orders }) => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {orders.map((order) => (
+            {orders.data.map((order) => (
               <tr key={order._id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   #{order._id.substring(order._id.length - 6)}

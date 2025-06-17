@@ -54,21 +54,21 @@ const SalesChart = ({ salesData, timeFilter, onPeriodChange }) => {
   }
 
   // Prepare chart data
-  const labels = salesData.map(item => item.date);
+  const labels = salesData.data.map(item => item.date);
   
   const data = {
     labels,
     datasets: [
       {
         label: 'Revenue',
-        data: salesData.map(item => item.revenue),
+        data: salesData.data.map(item => item.revenue),
         borderColor: 'rgb(79, 70, 229)',
         backgroundColor: 'rgba(79, 70, 229, 0.5)',
         yAxisID: 'y',
       },
       {
         label: 'Orders',
-        data: salesData.map(item => item.orders),
+        data: salesData.data.map(item => item.orders),
         borderColor: 'rgb(34, 197, 94)',
         backgroundColor: 'rgba(34, 197, 94, 0.5)',
         yAxisID: 'y1',

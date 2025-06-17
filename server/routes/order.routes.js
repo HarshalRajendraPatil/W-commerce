@@ -16,6 +16,7 @@ const {
   getVendorOrderDetails,
   updateOrderItemFulfillment
 } = require('../controllers/order.controller');
+const dashboardController = require('../controllers/dashboard.controller');
 
 const router = express.Router();
 
@@ -29,6 +30,7 @@ router.post('/', createOrder);
 router.get('/my-orders', getOrdersByUser);
 router.get('/analytics', authorize('admin'), getOrderAnalytics);
 router.get('/vendor', authorize('vendor'), getVendorOrders);
+router.get('/vendor/sales', authorize('vendor'), dashboardController.getVendorSalesStats);
 router.get('/:id', getOrder);
 router.get('/:id/payment-status', getPaymentStatus);
 router.post('/payment', processPayment);

@@ -7,7 +7,11 @@ const {
   forgotPassword,
   resetPassword,
   updatePassword,
-  verifyEmail
+  verifyEmail,
+  updateProfile,
+  updateAddress,
+  deleteAddress,
+  getProfile
 } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 
@@ -24,5 +28,11 @@ router.get('/verify-email/:token', verifyEmail);
 router.get('/me', protect, getMe);
 router.put('/update-password', protect, updatePassword);
 router.get('/logout', protect, logout);
+
+// Profile routes
+router.get('/profile', protect, getProfile);
+router.put('/profile', protect, updateProfile);
+router.put('/address', protect, updateAddress);
+router.delete('/address/:id', protect, deleteAddress);
 
 module.exports = router; 

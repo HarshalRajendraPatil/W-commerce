@@ -64,6 +64,30 @@ const authService = {
     return response.data;
   },
 
+  // Get detailed user profile
+  getProfile: async () => {
+    const response = await api.get('/auth/profile');
+    return response.data;
+  },
+
+  // Update user profile
+  updateProfile: async (profileData) => {
+    const response = await api.put('/auth/profile', profileData);
+    return response.data;
+  },
+
+  // Update user address
+  updateAddress: async (addressData) => {
+    const response = await api.put('/auth/address', addressData);
+    return response.data;
+  },
+
+  // Delete user address
+  deleteAddress: async (addressId) => {
+    const response = await api.delete(`/auth/address/${addressId}`);
+    return response.data;
+  },
+
   // Get user from local storage
   getUser: () => {
     const user = localStorage.getItem('user');

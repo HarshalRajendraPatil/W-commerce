@@ -313,7 +313,6 @@ const Coupons = () => {
       const result = await dispatch(fetchCouponStats(couponId)).unwrap();
       if (result && result.data) {
         setCouponStats(result.data);
-        console.log('Coupon stats loaded:', result.data);
       } else {
         toast.warning('No stats available for this coupon');
         // Provide empty stats object to avoid null reference errors

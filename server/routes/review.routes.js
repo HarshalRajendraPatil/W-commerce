@@ -12,14 +12,22 @@ const {
   getProductReviewAnalytics,
   getReviewAnalyticsOverview,
   getVendorProductReviews,
-  respondToReview
+  respondToReview,
+  getUserReviews
 } = require('../controllers/review.controller');
 
 const router = express.Router();
 
 // Public routes
 router.get('/',  getReviews);
+
+// Protected user routes - specific routes should come before parameterized routes
+router.get('/my', protect, getUserReviews);
 router.get('/vendor', protect, authorize('vendor'), getVendorProductReviews);
+router.get('/analytics/products/:productId', protect, getProductReviewAnalytics);
+router.get('/analytics/overview', protect, authorize('admin'), getReviewAnalyticsOverview);
+
+// Public parameterized route
 router.get('/:id', getReview);
 
 // Customer routes
@@ -34,7 +42,5 @@ router.post('/:id/respond', protect, authorize('vendor'), respondToReview);
 // Admin routes
 router.put('/:id/approve', protect, authorize('admin'), approveReview);
 router.put('/:id/reject', protect, authorize('admin'), rejectReview);
-router.get('/analytics/products/:productId', protect, getProductReviewAnalytics);
-router.get('/analytics/overview', protect, authorize('admin'), getReviewAnalyticsOverview);
 
 module.exports = router; 

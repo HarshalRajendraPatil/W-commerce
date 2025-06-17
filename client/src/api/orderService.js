@@ -79,8 +79,10 @@ export const getOrders = async (params = {}) => {
   if (params.sort) queryParams.append('sort', params.sort);
   if (params.status) queryParams.append('status', params.status);
   if (params.search) queryParams.append('search', params.search);
+  if (params.user) queryParams.append('user', params.user);
   
   const response = await axios.get(`/orders?${queryParams.toString()}`);
+
   return response.data;
 };
 

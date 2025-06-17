@@ -14,7 +14,7 @@ const TopProducts = ({ products }) => {
     <div className="p-6 bg-white rounded-lg shadow">
       <h2 className="text-lg font-semibold mb-4">Top Selling Products</h2>
       <div className="space-y-4">
-        {products.map((product) => (
+        {products.data.map((product) => (
           <div key={product._id} className="flex items-center p-3 border rounded-lg hover:bg-gray-50">
             <div className="flex-shrink-0 h-12 w-12 rounded-md overflow-hidden border border-gray-200">
               {product.image && product.image.url ? (

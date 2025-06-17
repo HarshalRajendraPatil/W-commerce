@@ -111,6 +111,38 @@ export const verifyEmail = createAsyncThunk(
   }
 );
 
+// Get user profile
+export const getProfile = createAsyncThunk(
+  'auth/getProfile',
+  async (_, thunkAPI) => {
+    try {
+      return await authService.getProfile();
+    } catch (error) {
+      const message = 
+        error.response?.data?.message || 
+        error.message || 
+        'Failed to fetch profile';
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
+// Update user profile
+export const updateProfile = createAsyncThunk(
+  'auth/updateProfile',
+  async (profileData, thunkAPI) => {
+    try {
+      return await authService.updateProfile(profileData);
+    } catch (error) {
+      const message = 
+        error.response?.data?.message || 
+        error.message || 
+        'Failed to update profile';
+      return thunkAPI.rejectWithValue(message);
+    }
+  }
+);
+
 // Auth slice
 export const authSlice = createSlice({
   name: 'auth',
@@ -218,6 +250,37 @@ export const authSlice = createSlice({
         toast.success('Email verified successfully!');
       })
       .addCase(verifyEmail.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      
+      // Get Profile
+      .addCase(getProfile.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(getProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.user = action.payload.data;
+      })
+      .addCase(getProfile.rejected, (state, action) => {
+        state.isLoading = false;
+        state.isError = true;
+        state.message = action.payload;
+      })
+      
+      // Update Profile
+      .addCase(updateProfile.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isSuccess = true;
+        state.user = action.payload.data;
+        toast.success('Profile updated successfully');
+      })
+      .addCase(updateProfile.rejected, (state, action) => {
         state.isLoading = false;
         state.isError = true;
         state.message = action.payload;

@@ -944,4 +944,48 @@ exports.respondToReview = async (req, res) => {
       error: err.message
     });
   }
+};
+
+/**
+ * @desc    Get reviews written by the logged-in user
+ * @route   GET /api/reviews/my
+ * @access  Private
+ */
+exports.getUserReviews = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const startIndex = (page - 1) * limit;
+    
+    // Find reviews by the current user
+    const query = Review.find({ user: req.user.id })
+      .skip(startIndex)
+      .limit(limit)
+      .populate({
+        path: 'product',
+        select: 'name images price'
+      })
+      .sort('-createdAt');
+    
+    const reviews = await query;
+    
+    // Get total count for pagination
+    const total = await Review.countDocuments({ user: req.user.id });
+    
+    // Pagination result
+    const pagination = {
+      current: page,
+      total: Math.ceil(total / limit),
+      count: total
+    };
+    
+    res.status(200).json({
+      success: true,
+      pagination,
+      count: reviews.length,
+      data: reviews
+    });
+  } catch (err) {
+    next(err);
+  }
 }; 

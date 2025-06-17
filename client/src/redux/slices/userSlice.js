@@ -1,13 +1,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import * as userService from '../../api/userService';
-import { toast } from 'react-toastify';
+import userService from '../../api/userService';
+import { toast } from 'react-hot-toast';
 
 // Async thunks
 export const fetchUsers = createAsyncThunk(
-  'users/fetchUsers',
-  async (params, { rejectWithValue }) => {
+  'user/fetchUsers',
+  async ({ page = 1, limit = 10, search = '', role = '', status = '', sortBy = 'createdAt', sortOrder = 'desc' }, { rejectWithValue }) => {
     try {
-      return await userService.getUsers(params);
+      const response = await userService.getUsers({ page, limit, search, role, status, sortBy, sortOrder });
+      return response;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch users');
     }
@@ -15,21 +16,23 @@ export const fetchUsers = createAsyncThunk(
 );
 
 export const fetchUserById = createAsyncThunk(
-  'users/fetchUserById',
-  async (userId, { rejectWithValue }) => {
+  'user/fetchUserById',
+  async (id, { rejectWithValue }) => {
     try {
-      return await userService.getUserById(userId);
+      const response = await userService.getUserById(id);
+      return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch user');
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch user details');
     }
   }
 );
 
 export const updateUser = createAsyncThunk(
-  'users/updateUser',
-  async ({ userId, userData }, { rejectWithValue }) => {
+  'user/updateUser',
+  async ({ id, userData }, { rejectWithValue }) => {
     try {
-      return await userService.updateUser(userId, userData);
+      const response = await userService.updateUser(id, userData);
+      return response;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update user');
     }
@@ -37,21 +40,47 @@ export const updateUser = createAsyncThunk(
 );
 
 export const deleteUser = createAsyncThunk(
-  'users/deleteUser',
-  async (userId, { rejectWithValue }) => {
+  'user/deleteUser',
+  async (id, { rejectWithValue }) => {
     try {
-      return await userService.deleteUser(userId);
+      await userService.deleteUser(id);
+      return id;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete user');
     }
   }
 );
 
+export const deactivateUser = createAsyncThunk(
+  'users/deactivateUser',
+  async (userId, { rejectWithValue }) => {
+    try {
+      const response = await userService.deactivateUser(userId);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to deactivate user');
+    }
+  }
+);
+
+export const activateUser = createAsyncThunk(
+  'users/activateUser',
+  async (userId, { rejectWithValue }) => {
+    try {
+      const response = await userService.activateUser(userId);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to activate user');
+    }
+  }
+);
+
 export const fetchUserAnalytics = createAsyncThunk(
-  'users/fetchUserAnalytics',
+  'user/fetchUserAnalytics',
   async (_, { rejectWithValue }) => {
     try {
-      return await userService.getUserAnalytics();
+      const response = await userService.getUserAnalytics();
+      return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch user analytics');
     }
@@ -63,39 +92,31 @@ const initialState = {
   users: [],
   userDetails: null,
   userAnalytics: null,
-  pagination: {
-    current: 1,
-    total: 1,
-    count: 0
-  },
   loading: false,
   error: null,
-  success: false,
-  message: ''
+  pagination: {
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10
+  }
 };
 
 // Create slice
 const userSlice = createSlice({
-  name: 'users',
+  name: 'user',
   initialState,
   reducers: {
-    clearUserError: (state) => {
+    clearError: (state) => {
       state.error = null;
     },
-    clearUserSuccess: (state) => {
-      state.success = false;
-      state.message = '';
-    },
-    resetUserState: (state) => {
+    clearUserDetails: (state) => {
       state.userDetails = null;
-      state.error = null;
-      state.success = false;
-      state.message = '';
     }
   },
   extraReducers: (builder) => {
     builder
-      // Fetch users
+      // Fetch Users
       .addCase(fetchUsers.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -103,14 +124,19 @@ const userSlice = createSlice({
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.loading = false;
         state.users = action.payload.data;
-        state.pagination = action.payload.pagination;
+        state.pagination = {
+          current: action.payload.pagination.current,
+          total: action.payload.pagination.total,
+          count: action.payload.pagination.count,
+        }
       })
       .addCase(fetchUsers.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        toast.error(action.payload);
       })
       
-      // Fetch user by ID
+      // Fetch User by ID
       .addCase(fetchUserById.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -122,21 +148,23 @@ const userSlice = createSlice({
       .addCase(fetchUserById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        toast.error(action.payload);
       })
       
-      // Update user
+      // Update User
       .addCase(updateUser.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(updateUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.userDetails = action.payload.data;
-        state.users = state.users.map(user => 
-          user._id === action.payload.data._id ? action.payload.data : user
-        );
-        state.success = true;
-        state.message = 'User updated successfully';
+        const index = state.users.findIndex(user => user._id === action.payload._id);
+        if (index !== -1) {
+          state.users[index] = action.payload;
+        }
+        if (state.userDetails?._id === action.payload._id) {
+          state.userDetails = action.payload;
+        }
         toast.success('User updated successfully');
       })
       .addCase(updateUser.rejected, (state, action) => {
@@ -145,17 +173,15 @@ const userSlice = createSlice({
         toast.error(action.payload);
       })
       
-      // Delete user
+      // Delete User
       .addCase(deleteUser.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(deleteUser.fulfilled, (state, action) => {
         state.loading = false;
-        // Instead of removing from array, mark as inactive
-        state.message = action.payload.message;
-        state.success = true;
-        toast.success('User deactivated successfully');
+        state.users = state.users.filter(user => user._id !== action.payload);
+        toast.success('User deleted successfully');
       })
       .addCase(deleteUser.rejected, (state, action) => {
         state.loading = false;
@@ -163,21 +189,56 @@ const userSlice = createSlice({
         toast.error(action.payload);
       })
       
-      // Fetch user analytics
+      // Activate user
+      .addCase(activateUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(activateUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.users = state.users.map(user => 
+          user._id === action.payload.data._id ? { ...user, active: true } : user
+        );
+        toast.success('User activated successfully');
+      })
+      .addCase(activateUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        toast.error(action.payload);
+      })
+
+      // Deactivate user
+      .addCase(deactivateUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deactivateUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.users = state.users.map(user => user._id === action.payload.data._id ? { ...user, active: false } : user);
+        toast.success('User deactivated successfully');
+      })
+      .addCase(deactivateUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        toast.error(action.payload);
+      })
+      
+      // Fetch User Analytics
       .addCase(fetchUserAnalytics.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchUserAnalytics.fulfilled, (state, action) => {
         state.loading = false;
-        state.userAnalytics = action.payload.data;
+        state.userAnalytics = action.payload;
       })
       .addCase(fetchUserAnalytics.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        toast.error(action.payload);
       });
   }
 });
 
-export const { clearUserError, clearUserSuccess, resetUserState } = userSlice.actions;
+export const { clearError, clearUserDetails } = userSlice.actions;
 export default userSlice.reducer; 

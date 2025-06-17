@@ -223,7 +223,7 @@ exports.getUserAnalytics = async (req, res) => {
     const inactiveUsers = await User.countDocuments({ active: false });
     
     // Get total orders count
-    const totalOrders = await Order.countDocuments();
+    const totalOrders = await Order.countDocuments({ status: { $ne: 'cancelled' } });
     
     // Get users by role
     const usersByRole = await User.aggregate([
@@ -248,8 +248,8 @@ exports.getUserAnalytics = async (req, res) => {
       {
         $group: {
           _id: {
-            month: { $month: '$createdAt' },
-            year: { $year: '$createdAt' }
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
           },
           count: { $sum: 1 }
         }
@@ -261,6 +261,9 @@ exports.getUserAnalytics = async (req, res) => {
     
     // Get top customers by order count
     const topCustomers = await Order.aggregate([
+      {
+        $match: { status: { $ne: 'cancelled' } }
+      },
       {
         $group: {
           _id: '$user',
@@ -279,28 +282,59 @@ exports.getUserAnalytics = async (req, res) => {
           from: 'users',
           localField: '_id',
           foreignField: '_id',
-          as: 'user'
+          as: 'userDetails'
         }
       },
       {
-        $unwind: '$user'
+        $unwind: '$userDetails'
       },
       {
         $project: {
-          _id: '$user._id',
-          name: '$user.name',
-          email: '$user.email',
+          _id: 1,
+          name: '$userDetails.name',
+          email: '$userDetails.email',
           orderCount: 1,
           totalSpent: 1
         }
       }
     ]);
     
-    // Format user roles data for easier consumption
-    const roleData = {};
-    usersByRole.forEach(role => {
-      roleData[role._id] = role.count;
-    });
+    // Get user activity stats
+    const userActivity = await Order.aggregate([
+      {
+        $match: { status: { $ne: 'cancelled' } }
+      },
+      {
+        $group: {
+          _id: '$user',
+          lastOrderDate: { $max: '$createdAt' },
+          orderCount: { $sum: 1 }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          activeUsers: {
+            $sum: {
+              $cond: [
+                { $gte: ['$lastOrderDate', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)] },
+                1,
+                0
+              ]
+            }
+          },
+          inactiveUsers: {
+            $sum: {
+              $cond: [
+                { $lt: ['$lastOrderDate', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)] },
+                1,
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
     
     res.status(200).json({
       success: true,
@@ -309,9 +343,10 @@ exports.getUserAnalytics = async (req, res) => {
         activeUsers,
         inactiveUsers,
         totalOrders,
-        usersByRole: roleData,
+        usersByRole,
         usersByMonth,
-        topCustomers
+        topCustomers,
+        userActivity: userActivity[0] || { activeUsers: 0, inactiveUsers: 0 }
       }
     });
   } catch (error) {
@@ -322,3 +357,17 @@ exports.getUserAnalytics = async (req, res) => {
     });
   }
 }; 
+
+exports.activateUser = async (req, res) => {
+  const user = await User.findById(req.params.id);
+  user.active = true;
+  await user.save();
+  res.status(200).json({ success: true, message: 'User activated successfully' });
+};
+
+exports.deactivateUser = async (req, res) => {
+  const user = await User.findById(req.params.id);
+  user.active = false;
+  await user.save();
+  res.status(200).json({ success: true, message: 'User deactivated successfully' });
+};

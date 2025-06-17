@@ -249,7 +249,6 @@ const Orders = () => {
     }
   };
 
-  console.log(stats);
   
   return (
     <div className="space-y-6">

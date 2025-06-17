@@ -13,16 +13,16 @@ const Coupon = require('../models/Coupon');
 exports.getDashboardStats = async (req, res) => {
   try {
     // Get counts
-    const userCount = await User.countDocuments();
+    const userCount = await User.countDocuments({ role: 'customer' });
     const productCount = await Product.countDocuments();
-    const orderCount = await Order.countDocuments();
+    const orderCount = await Order.countDocuments({ status: { $ne: 'cancelled' } });
     const categoryCount = await Category.countDocuments();
     const reviewCount = await Review.countDocuments();
     const couponCount = await Coupon.countDocuments();
 
     // Calculate total revenue
     const orders = await Order.find({ status: { $ne: 'cancelled' } });
-    const totalRevenue = orders.reduce((acc, order) => acc + order.totalAmount, 0);
+    const totalRevenue = orders.reduce((acc, order) => acc + order.totalPrice, 0);
     
     // Get low stock products
     const lowStockProducts = await Product.countDocuments({ stockCount: { $lt: 10 } });
@@ -37,7 +37,62 @@ exports.getDashboardStats = async (req, res) => {
       createdAt: { $gte: today },
       status: { $ne: 'cancelled' }
     });
-    const todayRevenue = todayOrders.reduce((acc, order) => acc + order.totalAmount, 0);
+    const todayRevenue = todayOrders.reduce((acc, order) => acc + order.totalPrice, 0);
+    
+    // Get recent user registrations
+    const recentUsers = await User.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('name email role createdAt');
+    
+    // Get top selling products
+    const topProducts = await Order.aggregate([
+      {
+        $match: { status: { $ne: 'cancelled' } }
+      },
+      {
+        $unwind: '$items'
+      },
+      {
+        $group: {
+          _id: '$items.product',
+          totalSales: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+          unitsSold: { $sum: '$items.quantity' }
+        }
+      },
+      {
+        $sort: { totalSales: -1 }
+      },
+      {
+        $limit: 5
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'productDetails'
+        }
+      },
+      {
+        $unwind: '$productDetails'
+      },
+      {
+        $project: {
+          _id: 1,
+          name: '$productDetails.name',
+          totalSales: 1,
+          unitsSold: 1
+        }
+      }
+    ]);
+    
+    // Get recent orders with customer details
+    const recentOrders = await Order.find({ status: { $ne: 'cancelled' } })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('user', 'name email')
+      .select('orderNumber totalAmount status createdAt');
     
     res.status(200).json({
       success: true,
@@ -52,7 +107,10 @@ exports.getDashboardStats = async (req, res) => {
         lowStockProducts,
         pendingOrders,
         todayOrders: todayOrders.length,
-        todayRevenue
+        todayRevenue,
+        recentUsers,
+        topProducts,
+        recentOrders
       }
     });
   } catch (error) {
@@ -231,7 +289,7 @@ exports.getSalesStats = async (req, res) => {
         };
       }
       salesByDay[date].count += 1;
-      salesByDay[date].revenue += order.totalAmount;
+      salesByDay[date].revenue += order.totalPrice;
     });
     
     // Convert to array format for frontend charts
@@ -947,6 +1005,168 @@ exports.getVendorAnalytics = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching vendor analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+/**
+ * @desc    Get system statistics for admin profile
+ * @route   GET /api/stats/system
+ * @access  Private/Admin
+ */
+exports.getSystemStats = async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const Product = require('../models/Product');
+    const Order = require('../models/Order');
+    
+    // Get total users count
+    const totalUsers = await User.countDocuments();
+    
+    // Get active users count
+    const activeUsers = await User.countDocuments({ active: true });
+    
+    // Get inactive users count
+    const inactiveUsers = await User.countDocuments({ active: false });
+    
+    // Get users by role
+    const usersByRole = await User.aggregate([
+      {
+        $group: {
+          _id: '$role',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Format user roles data for easier consumption
+    const roleData = {};
+    usersByRole.forEach(role => {
+      roleData[role._id] = role.count;
+    });
+    
+    // Get total products count
+    const totalProducts = await Product.countDocuments();
+    
+    // Get total revenue
+    const ordersData = await Order.aggregate([
+      {
+        $match: { 
+          status: { $nin: ['cancelled', 'refunded'] } 
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$totalPrice' },
+          orderCount: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    const totalRevenue = ordersData.length > 0 ? ordersData[0].totalRevenue : 0;
+    const totalOrders = ordersData.length > 0 ? ordersData[0].orderCount : 0;
+    
+    // Get registrations by month for the current year
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    
+    const usersByMonth = await User.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfYear }
+        }
+      },
+      {
+        $group: {
+          _id: { month: { $month: '$createdAt' } },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { '_id.month': 1 }
+      }
+    ]);
+    
+    // Get registrations for current and last month
+    const currentMonth = new Date().getMonth() + 1; // JS months are 0-indexed
+    const registrationsThisMonth = usersByMonth.find(m => m._id.month === currentMonth)?.count || 0;
+    
+    // Last month (handle January edge case)
+    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const registrationsLastMonth = usersByMonth.find(m => m._id.month === lastMonth)?.count || 0;
+    
+    // Calculate growth rate
+    let registrationGrowth = 0;
+    if (registrationsLastMonth > 0) {
+      registrationGrowth = Math.round(((registrationsThisMonth - registrationsLastMonth) / registrationsLastMonth) * 100);
+    } else if (registrationsThisMonth > 0) {
+      registrationGrowth = 100; // If last month was 0 and this month has registrations
+    }
+    
+    // Get top customers
+    const topCustomers = await Order.aggregate([
+      {
+        $match: { 
+          status: { $nin: ['cancelled', 'refunded'] } 
+        }
+      },
+      {
+        $group: {
+          _id: '$user',
+          orderCount: { $sum: 1 },
+          totalSpent: { $sum: '$totalPrice' }
+        }
+      },
+      {
+        $sort: { totalSpent: -1 }
+      },
+      {
+        $limit: 5
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'userDetails'
+        }
+      },
+      {
+        $unwind: '$userDetails'
+      },
+      {
+        $project: {
+          _id: '$userDetails._id',
+          name: '$userDetails.name',
+          email: '$userDetails.email',
+          orderCount: 1,
+          totalSpent: 1
+        }
+      }
+    ]);
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        totalUsers,
+        activeUsers,
+        inactiveUsers,
+        usersByRole: roleData,
+        totalProducts,
+        totalRevenue,
+        totalOrders,
+        registrationsThisMonth,
+        registrationsLastMonth,
+        registrationGrowth,
+        topCustomers
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching system stats:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'

@@ -47,6 +47,7 @@ import Reviews from './pages/admin/Reviews';
 import VendorApplications from './pages/admin/VendorApplications';
 import ProductView from './pages/admin/ProductView';
 import CategoryDetails from './pages/admin/CategoryDetails';
+import UserDetails from './pages/admin/UserDetails';
 
 // Vendor Pages
 import VendorDashboard from './pages/vendor/Dashboard';
@@ -233,6 +234,7 @@ function App() {
             <Route path="customers" element={<Customers />} />
             <Route path="coupons" element={<Coupons />} />
             <Route path="reviews" element={<Reviews />} />
+            <Route path="users/:id" element={<UserDetails />} />
             <Route path="vendor-applications" element={<VendorApplications />} />
             <Route path="products/:id" element={
               <ProtectedRoute allowedRoles={['admin']}>
