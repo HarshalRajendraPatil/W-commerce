@@ -58,7 +58,7 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
   };
   
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-transparent backdrop-blur-sm bg-opacity-50 flex items-center justify-center p-4">
       <div 
         ref={modalRef}
         className={`bg-white rounded-lg shadow-xl overflow-hidden w-full ${sizeClasses[size] || sizeClasses.md}`}

@@ -122,17 +122,16 @@ const Categories = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this category?')) {
+
       setDeleteLoading(true);
       try {
         await dispatch(deleteCategory(id)).unwrap();
-        toast.success('Category deleted successfully');
       } catch (err) {
         toast.error(err.message || 'Failed to delete category');
       } finally {
         setDeleteLoading(false);
       }
-    }
+
   };
   
   const handleEdit = (category) => {
@@ -142,7 +141,7 @@ const Categories = () => {
   
   const handleViewStats = (category) => {
     setSelectedCategory(category);
-    // window.location.href = `/admin/categories/details/${category._id}`;
+    setShowStatsModal(true);
   };
   
   const handleFormSuccess = () => {
@@ -437,7 +436,7 @@ const Categories = () => {
         onClose={() => setShowAddModal(false)}
         title="Add New Category"
       >
-        <CategoryForm onSuccess={handleFormSuccess} />
+        <CategoryForm onSuccess={handleFormSuccess} categories={categories}/>
       </Modal>
       
       {/* Edit Category Modal */}
@@ -449,6 +448,7 @@ const Categories = () => {
         <CategoryForm 
           category={selectedCategory}
           onSuccess={handleFormSuccess}
+          categories={categories}
         />
       </Modal>
     </div>

@@ -599,16 +599,16 @@ exports.getProfile = async (req, res, next) => {
           approvedDate: vendorApplication.updatedAt
         };
       }
-      
+
       // Get product count
       const productCount = await Product.countDocuments({ 
-        user: req.user.id,
-        isActive: true
+        seller: req.user._id,
+        published: true
       });
       
       // Get total sales
       const orders = await Order.find({ 
-        'items.product': { $in: await Product.find({ user: req.user.id }).distinct('_id') },
+        'items.product': { $in: await Product.find({ seller: req.user._id }).distinct('_id') },
         status: { $nin: ['cancelled', 'refunded'] }
       });
       
@@ -616,7 +616,7 @@ exports.getProfile = async (req, res, next) => {
         // Only count items from this vendor
         const vendorItems = order.items.filter(async (item) => {
           const product = await Product.findById(item.product);
-          return product && product.user.toString() === req.user.id;
+          return product && product.seller.toString() === req.user._id;
         });
         
         return sum + vendorItems.reduce((itemSum, item) => itemSum + item.total, 0);

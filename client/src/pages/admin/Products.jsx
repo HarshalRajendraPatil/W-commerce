@@ -42,9 +42,6 @@ const Products = () => {
   }, [dispatch, currentPage, itemsPerPage, sortOption]);
 
   useEffect(() => {
-    if (success && message) {
-      toast.success(message);
-    }
     if (error) {
       toast.error(error);
     }
@@ -126,12 +123,10 @@ const Products = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
       setActionLoading(true);
       await dispatch(deleteProduct(id));
       setActionLoading(false);
       loadProducts(); // Refresh the list
-    }
   };
 
   const handleToggleFeatured = async (id) => {

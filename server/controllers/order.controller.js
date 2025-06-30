@@ -118,8 +118,6 @@ exports.createOrder = async (req, res, next) => {
       // Find coupon by code, not by ID
       const coupon = await Coupon.findOne({ code: couponCode });
       
-      console.log(`Coupon lookup for code ${couponCode}:`, coupon);
-      
       if (!coupon || !coupon.isActive || new Date(coupon.endDate) < new Date()) {
         return res.status(400).json({
           success: false,
@@ -484,7 +482,10 @@ exports.updateOrderStatus = async (req, res, next) => {
       req.params.id, 
       updateData,
       { new: true, runValidators: true }
-    );
+    ).populate({
+      path: 'user',
+      select: 'name email'
+    });
     
     // If order is cancelled or returned, restore product quantities
     if ((status === 'cancelled' || status === 'returned') && 

@@ -62,7 +62,7 @@ const Footer = () => {
             <p className="text-gray-300 mb-4">
               Subscribe to our newsletter for the latest updates and offers.
             </p>
-            <form className="flex flex-col sm:flex-row gap-2">
+            <form className="flex flex-col sm:flex-row gap-2 bg-white rounded-md">
               <input 
                 type="email" 
                 placeholder="Your email address" 
@@ -70,7 +70,7 @@ const Footer = () => {
               />
               <button 
                 type="submit" 
-                className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-md"
+                className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-r-md"
               >
                 Subscribe
               </button>

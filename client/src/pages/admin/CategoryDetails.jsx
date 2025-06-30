@@ -14,8 +14,6 @@ const CategoryDetails = () => {
   let { category, isLoading, error } = useSelector((state) => state.category);
   const [showEditModal, setShowEditModal] = useState(false);
   const [activeTab, setActiveTab] = useState('stats'); // 'stats' or 'products'
-
-  category = category?.data;
   
   useEffect(() => {
     if (id) {

@@ -224,15 +224,14 @@ const Orders = () => {
   
   // Handle order status update
   const handleStatusUpdate = async (orderId, newStatus) => {
-    if (window.confirm(`Are you sure you want to update the order status to ${newStatus}?`)) {
       try {
-        await dispatch(updateOrderStatus({
+          await dispatch(updateOrderStatus({
           orderId,
           statusData: { 
             status: newStatus,
             note: `Status updated to ${newStatus} by admin`
           }
-        })).unwrap();
+        }));
         
         // Hide dropdown after update
         const dropdown = document.getElementById(`dropdown-menu-${orderId}`);
@@ -241,12 +240,15 @@ const Orders = () => {
         }
         
         toast.success(`Order status updated to ${newStatus}`);
+        
+        // Refresh orders with current filters
+        dispatch(fetchOrders(buildOrderParams()));
+        
         // Refresh analytics
         dispatch(fetchOrderAnalytics());
       } catch (error) {
         toast.error(error || "Failed to update status");
       }
-    }
   };
 
   

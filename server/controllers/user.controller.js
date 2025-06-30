@@ -362,12 +362,12 @@ exports.activateUser = async (req, res) => {
   const user = await User.findById(req.params.id);
   user.active = true;
   await user.save();
-  res.status(200).json({ success: true, message: 'User activated successfully' });
+  res.status(200).json({ success: true, data: user });
 };
 
 exports.deactivateUser = async (req, res) => {
   const user = await User.findById(req.params.id);
   user.active = false;
   await user.save();
-  res.status(200).json({ success: true, message: 'User deactivated successfully' });
+  res.status(200).json({ success: true, data: user });
 };

@@ -5,7 +5,7 @@ const OrderSummary = ({ cart, showCheckoutButton = true }) => {
   // Calculate values
   const subtotal = cart?.totalPrice || 0;
   const discount = cart?.discountAmount || 0;
-  const tax = subtotal * 0.05; // 5% tax
+  const tax = subtotal * 0.18; // 18% tax
   const shipping = 0; // Free shipping
   const total = subtotal + tax - discount;
   

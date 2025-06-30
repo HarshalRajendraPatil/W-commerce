@@ -24,6 +24,7 @@ const Customers = () => {
   const [endDate, setEndDate] = useState('');
   const [minOrders, setMinOrders] = useState('');
   const [maxOrders, setMaxOrders] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
   
   // Load users and analytics on component mount
   useEffect(() => {
@@ -90,38 +91,39 @@ const Customers = () => {
     setMaxOrders('');
     setCurrentPage(1);
   };
+
   
   // Handle user deactivation
   const handleDeactivate = async (id) => {
-    if (window.confirm('Are you sure you want to deactivate this user?')) {
-      try {
-        await dispatch(deactivateUser(id)).unwrap();
-        // Update local state immediately
-        const updatedUsers = users.map(user => 
-          user._id === id ? { ...user, active: false } : user
-        );
-        // Refresh analytics only
-        dispatch(fetchUserAnalytics());
-      } catch (error) {
-        toast.error(error || 'Failed to deactivate user');
-      }
+    if (actionLoading) return;
+    
+    try {
+      setActionLoading(true);
+      await dispatch(deactivateUser(id)).unwrap();
+      // Refresh analytics without setting loading state for the whole page
+      dispatch(fetchUserAnalytics());
+      toast.success('User deactivated successfully');
+    } catch (error) {
+      toast.error(error || 'Failed to deactivate user');
+    } finally {
+      setActionLoading(false);
     }
   };
   
   // Handle user activation
   const handleActivate = async (id) => {
-    if (window.confirm('Are you sure you want to activate this user?')) {
-      try {
-        await dispatch(activateUser(id)).unwrap();
-        // Update local state immediately
-        const updatedUsers = users.map(user => 
-          user._id === id ? { ...user, active: true } : user
-        );
-        // Refresh analytics only
-        dispatch(fetchUserAnalytics());
-      } catch (error) {
-        toast.error(error || 'Failed to activate user');
-      }
+    if (actionLoading) return;
+    
+    try {
+      setActionLoading(true);
+      await dispatch(activateUser(id)).unwrap();
+      // Refresh analytics without setting loading state for the whole page
+      dispatch(fetchUserAnalytics());
+      toast.success('User activated successfully');
+    } catch (error) {
+      toast.error(error || 'Failed to activate user');
+    } finally {
+      setActionLoading(false);
     }
   };
   
@@ -143,7 +145,7 @@ const Customers = () => {
     navigate(`/admin/users/${user._id}`);
   };
 
-  if (loading) {
+  if (loading && !actionLoading) {
     return <Loader />;
   }
   
@@ -477,16 +479,18 @@ const Customers = () => {
                     {user.active ? (
                       <button
                         onClick={() => handleDeactivate(user._id)}
-                        className="text-red-600 hover:text-red-900"
+                        disabled={actionLoading}
+                        className={`text-red-600 hover:text-red-900 ${actionLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        Deactivate
+                        {actionLoading ? 'Processing...' : 'Deactivate'}
                       </button>
                     ) : (
                       <button
                         onClick={() => handleActivate(user._id)}
-                        className="text-green-600 hover:text-green-900"
+                        disabled={actionLoading}
+                        className={`text-green-600 hover:text-green-900 ${actionLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        Activate
+                        {actionLoading ? 'Processing...' : 'Activate'}
                       </button>
                     )}
                   </td>

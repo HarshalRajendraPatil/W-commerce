@@ -191,34 +191,28 @@ const userSlice = createSlice({
       
       // Activate user
       .addCase(activateUser.pending, (state) => {
-        state.loading = true;
         state.error = null;
       })
       .addCase(activateUser.fulfilled, (state, action) => {
-        state.loading = false;
         state.users = state.users.map(user => 
           user._id === action.payload.data._id ? { ...user, active: true } : user
         );
-        toast.success('User activated successfully');
       })
       .addCase(activateUser.rejected, (state, action) => {
-        state.loading = false;
         state.error = action.payload;
         toast.error(action.payload);
       })
 
       // Deactivate user
       .addCase(deactivateUser.pending, (state) => {
-        state.loading = true;
         state.error = null;
       })
       .addCase(deactivateUser.fulfilled, (state, action) => {
-        state.loading = false;
-        state.users = state.users.map(user => user._id === action.payload.data._id ? { ...user, active: false } : user);
-        toast.success('User deactivated successfully');
+        state.users = state.users.map(user => 
+          user._id === action.payload.data._id ? { ...user, active: false } : user
+        );
       })
       .addCase(deactivateUser.rejected, (state, action) => {
-        state.loading = false;
         state.error = action.payload;
         toast.error(action.payload);
       })

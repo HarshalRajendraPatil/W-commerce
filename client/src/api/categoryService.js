@@ -72,7 +72,16 @@ const categoryService = {
       
       // Append other category data
       Object.keys(categoryData).forEach(key => {
-        formData.append(key, categoryData[key]);
+        // Skip null values or convert them appropriately
+        if (categoryData[key] === null) {
+          if (key === 'parent') {
+            // Send 'null' string for parent to be converted to null on server
+            formData.append(key, 'null');
+          }
+          // Skip other null values
+        } else {
+          formData.append(key, categoryData[key]);
+        }
       });
       
       const response = await axios.put(`/categories/${id}`, formData, {

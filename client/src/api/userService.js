@@ -108,9 +108,9 @@ const getMyReviews = async () => {
 
 // Vendor-specific services
 // Get vendor products
-const getVendorProducts = async (page = 1, limit = 10) => {
-  const response = await axios.get(`/products/vendor/products?page=${page}&limit=${limit}`);
-  console.log(response.data);
+const getVendorProducts = async (queryParams) => {
+  console.log(queryParams);
+  const response = await axios.get(`/products/vendor/products?${queryParams}`);
   return response.data;
 };
 
@@ -124,6 +124,17 @@ const getVendorSales = async (period = 'month') => {
 // Get system stats
 const getSystemStats = async () => {
   const response = await axios.get('/stats/system');
+  return response.data;
+};
+
+// Product Management
+const updateProductStatus = async (productId, published) => {
+  const response = await axios.patch(`/products/${productId}/status`, { published });
+  return response.data;
+};
+
+const deleteProduct = async (productId) => {
+  const response = await axios.delete(`/products/${productId}`);
   return response.data;
 };
 
@@ -144,7 +155,9 @@ const userService = {
   deleteUser,
   activateUser,
   deactivateUser,
-  getUserAnalytics
+  getUserAnalytics,
+  updateProductStatus,
+  deleteProduct
 };
 
 export default userService; 

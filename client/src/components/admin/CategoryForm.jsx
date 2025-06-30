@@ -8,9 +8,9 @@ import {
 } from '../../redux/slices/categorySlice';
 import { FiImage, FiUpload, FiX } from 'react-icons/fi';
 
-const CategoryForm = ({ category = null, onSuccess }) => {
+const CategoryForm = ({ category = null, onSuccess, categories = [] }) => {
   const dispatch = useDispatch();
-  const { categories, isLoading } = useSelector((state) => state.category);
+  const { isLoading } = useSelector((state) => state.category);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -26,8 +26,6 @@ const CategoryForm = ({ category = null, onSuccess }) => {
   const [errors, setErrors] = useState({});
   
   useEffect(() => {
-    // Fetch categories for parent dropdown
-    dispatch(fetchCategories());
     
     // If editing an existing category, populate the form
     if (category) {
@@ -44,7 +42,7 @@ const CategoryForm = ({ category = null, onSuccess }) => {
         setImagePreview(category.image.url);
       }
     }
-  }, [dispatch, category]);
+  }, [category]);
   
   const validateForm = () => {
     const newErrors = {};
@@ -90,7 +88,7 @@ const CategoryForm = ({ category = null, onSuccess }) => {
       reader.readAsDataURL(file);
     }
   };
-  
+
   const removeImage = () => {
     setFormData({
       ...formData,
@@ -106,14 +104,28 @@ const CategoryForm = ({ category = null, onSuccess }) => {
       return;
     }
     
+    // Create a copy of the form data for submission
+    const submitFormData = { ...formData };
+    
+    // Convert empty parent string to null
+    if (submitFormData.parent === '') {
+      submitFormData.parent = null;
+    }
+    
     // Create FormData object for file upload
     const submitData = new FormData();
-    for (const key in formData) {
-      if (key === 'image' && formData[key] === null) {
+    for (const key in submitFormData) {
+      if (key === 'image' && submitFormData[key] === null) {
         // Skip null image
         continue;
       }
-      submitData.append(key, formData[key]);
+      
+      // Only append the parent field if it's not null
+      if (key === 'parent' && submitFormData[key] === null) {
+        submitData.append('parent', '');
+      } else {
+        submitData.append(key, submitFormData[key]);
+      }
     }
     
     try {
@@ -121,12 +133,12 @@ const CategoryForm = ({ category = null, onSuccess }) => {
         // Update existing category
         await dispatch(updateCategory({ 
           id: category._id, 
-          categoryData: submitData 
+          categoryData: submitFormData 
         })).unwrap();
         toast.success('Category updated successfully');
       } else {
         // Create new category
-        await dispatch(createCategory(submitData)).unwrap();
+        await dispatch(createCategory(submitFormData)).unwrap();
         toast.success('Category created successfully');
         
         // Reset form after creating
@@ -158,7 +170,7 @@ const CategoryForm = ({ category = null, onSuccess }) => {
   });
   
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6 bg-transparent backdrop-blur-sm">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div className="col-span-2 md:col-span-1">
           <label className="block text-sm font-medium text-gray-700">

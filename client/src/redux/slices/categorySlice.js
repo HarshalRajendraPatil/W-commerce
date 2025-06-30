@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from '../../api/axios';
+import categoryService from '../../api/categoryService';
 
 // Base URL for API requests
 
@@ -20,8 +20,9 @@ export const fetchCategories = createAsyncThunk(
       const queryString = queryParams.toString();
       const url = queryString ? `/categories?${queryString}` : '/categories';
       
-      const response = await axios.get(url);
-      return response.data.data;
+      const response = await categoryService.getCategories(params);
+
+      return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
     }
@@ -32,7 +33,7 @@ export const fetchCategoryById = createAsyncThunk(
   'categories/fetchCategoryById',
   async (id, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`/categories/${id}`);
+      const response = await categoryService.getCategory(id);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -44,7 +45,7 @@ export const createCategory = createAsyncThunk(
   'categories/createCategory',
   async (categoryData, { rejectWithValue }) => {
     try {
-      const response = await axios.post("/categories", categoryData);
+      const response = await categoryService.createCategory(categoryData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -56,7 +57,7 @@ export const updateCategory = createAsyncThunk(
   'categories/updateCategory',
   async ({ id, categoryData }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(`/categories/${id}`, categoryData);
+      const response = await categoryService.updateCategory(id, categoryData);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -68,7 +69,7 @@ export const deleteCategory = createAsyncThunk(
   'categories/deleteCategory',
   async (id, { rejectWithValue }) => {
     try {
-      await axios.delete(`/categories/${id}`);
+      await categoryService.deleteCategory(id);
       return id;
     } catch (error) {
       return rejectWithValue(error.response.data);

@@ -41,6 +41,16 @@ const productService = {
     }
   },
 
+  // Toggle featured status
+  toggleFeaturedStatus: async (id) => {
+    try {
+      const response = await axios.patch(`/products/${id}/featured`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Get top-rated products
   getTopRatedProducts: async (limit = 5) => {
     try {

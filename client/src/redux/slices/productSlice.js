@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from '../../api/axios';
+import productService from '../../api/productService';
 
 // Async thunks for product operations
 export const fetchProducts = createAsyncThunk(
@@ -66,7 +67,7 @@ export const deleteProduct = createAsyncThunk(
   'products/deleteProduct',
   async (id, { rejectWithValue }) => {
     try {
-      await axios.delete(`/products/${id}`);
+      await productService.deleteProduct(id)
       return id;
     } catch (error) {
       return rejectWithValue(error.response.data);
@@ -78,21 +79,8 @@ export const toggleFeatured = createAsyncThunk(
   'products/toggleFeatured',
   async (id, { rejectWithValue, getState }) => {
     try {
-      // Find the product in the state to get its current featured status
-      const { products } = getState().product;
-      const product = products.data?.find(p => p._id === id);
-      
-      if (!product) {
-        throw new Error('Product not found');
-      }
-
-      
-      // Update the product with the opposite featured status
-      const response = await axios.put(`/products/${id}`, {
-        isFeatured: !product.isFeatured
-      });
-      
-      return response.data.data;
+      const response = await productService.toggleFeaturedStatus(id);
+      return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || { message: error.message });
     }
@@ -206,9 +194,16 @@ const productSlice = createSlice({
       })
       .addCase(toggleFeatured.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.products = state.products.data?.map(product => 
-          product._id === action.payload._id ? action.payload : product
-        );
+        // Update the products array if it exists
+        if (state.products && state.products.data) {
+          state.products.data = state.products.data.map(product => 
+            product._id === action.payload._id ? action.payload : product
+          );
+        }
+        // Update the single product if it matches
+        if (state.product && state.product._id === action.payload._id) {
+          state.product = action.payload;
+        }
         state.success = true;
         state.message = `Product ${action.payload.isFeatured ? 'marked as featured' : 'unmarked as featured'} successfully`;
       })

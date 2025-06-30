@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProductById, deleteProduct, toggleFeatured } from '../../redux/slices/productSlice';
@@ -9,6 +9,7 @@ const ProductView = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { product, isLoading, error } = useSelector((state) => state.product);
+  const [isFeatured, setIsFeatured] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -17,21 +18,32 @@ const ProductView = () => {
   }, [dispatch, id]);
 
   useEffect(() => {
+    if (product) {
+      setIsFeatured(product.isFeatured);
+    }
+  }, [product]);
+
+  useEffect(() => {
     if (error) {
       toast.error(error);
     }
   }, [error]);
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
       await dispatch(deleteProduct(id));
       navigate('/admin/products');
-      toast.success('Product deleted successfully');
-    }
   };
 
   const handleToggleFeatured = async () => {
-    await dispatch(toggleFeatured(id));
+    try {
+      const resultAction = await dispatch(toggleFeatured(id));
+      if (toggleFeatured.fulfilled.match(resultAction)) {
+        setIsFeatured(!isFeatured);
+        toast.success(`Product ${!isFeatured ? 'marked as featured' : 'removed from featured'} successfully`);
+      }
+    } catch (err) {
+      toast.error('Failed to update featured status');
+    }
   };
 
   if (isLoading) {
@@ -56,10 +68,10 @@ const ProductView = () => {
           <button
             onClick={handleToggleFeatured}
             className={`px-4 py-2 shadow-sm text-sm font-medium rounded-md text-white ${
-              product.isFeatured ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-indigo-600 hover:bg-indigo-700'
+              isFeatured ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-indigo-600 hover:bg-indigo-700'
             }`}
           >
-            {product.isFeatured ? 'Remove from Featured' : 'Mark as Featured'}
+            {isFeatured ? 'Remove from Featured' : 'Mark as Featured'}
           </button>
           <button
             onClick={handleDelete}
@@ -136,7 +148,7 @@ const ProductView = () => {
               </span>
             </div>
 
-            {product.isFeatured && (
+            {isFeatured && (
               <div className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-indigo-100 text-indigo-800">
                 Featured Product
               </div>

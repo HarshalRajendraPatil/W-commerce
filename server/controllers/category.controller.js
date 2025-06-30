@@ -127,6 +127,11 @@ exports.getCategory = async (req, res, next) => {
  */
 exports.createCategory = async (req, res, next) => {
   try {
+    // Handle parent field - convert 'null' string to null
+    if (req.body.parent === 'null' || req.body.parent === '') {
+      req.body.parent = null;
+    }
+    
     // Check if parent exists
     if (req.body.parent) {
       const parentCategory = await Category.findById(req.body.parent);
@@ -140,9 +145,7 @@ exports.createCategory = async (req, res, next) => {
     }
 
     if (req.files) {
-      const result = await cloudinary.uploader.upload(req.files.image.tempFilePath, {
-        folder: 'categories'
-      });
+      const result = await cloudinary.uploadToCloudinary(req.files.image.tempFilePath, 'categories');
       req.body.image = {
         publicId: result.public_id,
         url: result.secure_url
@@ -167,6 +170,11 @@ exports.createCategory = async (req, res, next) => {
  */
 exports.updateCategory = async (req, res, next) => {
   try {
+    // Handle parent field - convert 'null' string to null
+    if (req.body.parent === 'null' || req.body.parent === '') {
+      req.body.parent = null;
+    }
+    
     // Check if parent exists if updating parent
     if (req.body.parent) {
       const parentCategory = await Category.findById(req.body.parent);
@@ -185,16 +193,6 @@ exports.updateCategory = async (req, res, next) => {
           message: 'Category cannot be its own parent'
         });
       }
-
-      if (req.files) {
-        const result = await cloudinary.uploader.upload(req.files.image.tempFilePath, {
-          folder: 'categories'
-        });
-        req.body.image = {
-          publicId: result.public_id,
-          url: result.secure_url
-        };
-      }
       
       // Check if the new parent is not a child of this category
       const subcategories = await Category.find({ parent: req.params.id });
@@ -207,6 +205,18 @@ exports.updateCategory = async (req, res, next) => {
         });
       }
     }
+
+    const categoryToUpdate = await Category.findById(req.params.id);
+
+    if (req.files) {
+      await cloudinary.removeFromCloudinary(categoryToUpdate.image.publicId);
+
+      const result = await cloudinary.uploadToCloudinary(req.files.image.tempFilePath, 'categories');
+      req.body.image = {
+        publicId: result.public_id,
+        url: result.secure_url
+      };
+    }
     
     const category = await Category.findByIdAndUpdate(
       req.params.id,
@@ -216,7 +226,7 @@ exports.updateCategory = async (req, res, next) => {
       path: 'parent',
       select: 'name slug'
     });
-    
+
     if (!category) {
       return res.status(404).json({
         success: false,
@@ -270,7 +280,7 @@ exports.deleteCategory = async (req, res, next) => {
     }
 
     if (category.image.publicId) {
-      await cloudinary.uploader.destroy(category.image.publicId);
+      await cloudinary.removeFromCloudinary(category.image.publicId);
     }
     
     await category.deleteOne();
