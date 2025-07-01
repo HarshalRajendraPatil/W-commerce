@@ -39,9 +39,6 @@ const AdminProfile = () => {
   const [systemStats, setSystemStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-
-  console.log("systemStats", systemStats);
-
   
   useEffect(() => {
     fetchProfileData();
@@ -56,7 +53,25 @@ const AdminProfile = () => {
       
       // Fetch system stats
       const statsRes = await userService.getSystemStats();
-      setSystemStats(statsRes.data);
+      
+      // Check if we have a valid response with data
+      if (statsRes?.data && statsRes?.success) {
+        // The API returns data in a nested structure: { success: true, data: { ... } }
+        // Extract the actual data and set it to state
+        const systemStatsData = statsRes.data;
+        
+        // Fetch user stats for chart data
+        const userStatsRes = await userService.getUserStats();
+        
+        if (userStatsRes?.data && userStatsRes?.success) {
+          // Combine the data
+          systemStatsData.usersByMonth = userStatsRes.data.usersByMonth;
+        }
+        
+        setSystemStats(systemStatsData);
+      } else {
+        toast.error('Invalid system stats data format');
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to load profile data');
     } finally {
@@ -66,10 +81,49 @@ const AdminProfile = () => {
   
   // Prepare chart data
   const getChartData = () => {
-    if (!systemStats?.monthlyRegistrations) return null;
+    if (!systemStats) {
+      return null;
+    }
 
-    const months = systemStats.monthlyRegistrations.map(item => item.month);
-    const registrations = systemStats.monthlyRegistrations.map(item => item.count);
+    // Format month names from the month numbers
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Create an array of all months in the current year
+    const allMonths = monthNames.map((name, index) => ({
+      month: name,
+      count: 0
+    }));
+    
+    // Create monthly registrations data from the usersByMonth aggregate in the API
+    // This is a manual creation since the API doesn't provide this data directly
+    
+    // If we have usersByMonth data from the API, use it
+    if (systemStats.usersByMonth && Array.isArray(systemStats.usersByMonth)) {
+      // Create a monthlyRegistrations array if it doesn't exist
+      if (!systemStats.monthlyRegistrations) {
+        systemStats.monthlyRegistrations = allMonths;
+      }
+      
+      // Process the usersByMonth data
+      systemStats.usersByMonth.forEach(item => {
+        // Check if the data has the format from getUserStats API
+        if (item.date && typeof item.date === 'string') {
+          const parts = item.date.split('-');
+          const monthIndex = parseInt(parts[1]) - 1;
+          
+          if (monthIndex >= 0 && monthIndex < 12) {
+            allMonths[monthIndex].count = item.users;
+          }
+        }
+      });
+    }
+    
+    // Extract months and counts for the chart
+    const months = allMonths.map(item => item.month);
+    const registrations = allMonths.map(item => item.count);
+    
+    // Store the processed data for use in the component
+    systemStats.monthlyRegistrations = allMonths;
 
     return {
       labels: months,
@@ -101,7 +155,7 @@ const AdminProfile = () => {
       y: {
         beginAtZero: true,
         ticks: {
-          stepSize: 1
+          stepSize: 100
         }
       }
     }

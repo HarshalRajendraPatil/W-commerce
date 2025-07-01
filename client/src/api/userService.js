@@ -109,7 +109,6 @@ const getMyReviews = async () => {
 // Vendor-specific services
 // Get vendor products
 const getVendorProducts = async (queryParams) => {
-  console.log(queryParams);
   const response = await axios.get(`/products/vendor/products?${queryParams}`);
   return response.data;
 };
@@ -124,6 +123,12 @@ const getVendorSales = async (period = 'month') => {
 // Get system stats
 const getSystemStats = async () => {
   const response = await axios.get('/stats/system');
+  return response.data;
+};
+
+// Get user stats for charts
+const getUserStats = async () => {
+  const response = await axios.get('/dashboard/user-stats');
   return response.data;
 };
 
@@ -149,6 +154,7 @@ const userService = {
   getVendorProducts,
   getVendorSales,
   getSystemStats,
+  getUserStats,
   getUsers,
   getUserById,
   updateUser,
