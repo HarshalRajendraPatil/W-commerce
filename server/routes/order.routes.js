@@ -31,12 +31,12 @@ router.get('/my-orders', getOrdersByUser);
 router.get('/analytics', authorize('admin'), getOrderAnalytics);
 router.get('/vendor', authorize('vendor'), getVendorOrders);
 router.get('/vendor/sales', authorize('vendor'), dashboardController.getVendorSalesStats);
-router.get('/:id', getOrder);
-router.get('/:id/payment-status', getPaymentStatus);
 router.post('/payment', processPayment);
 router.post('/create-razorpay-order', createRazorpayOrder);
 router.post('/:id/cancel', cancelOrder);
 router.get('/track/:trackingNumber', trackOrder);
+router.get('/:id/payment-status', getPaymentStatus);
+router.get('/:id', getOrder);
 
 // Vendor routes
 router.get('/vendor/:id', authorize('vendor'), getVendorOrderDetails);

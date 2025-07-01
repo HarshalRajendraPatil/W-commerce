@@ -57,6 +57,7 @@ import VendorOrderDetails from './pages/vendor/OrderDetails';
 import VendorReviews from './pages/vendor/Reviews';
 import VendorAnalytics from './pages/vendor/Analytics';
 import AddProduct from './pages/vendor/AddProduct';
+import EditProduct from './pages/vendor/EditProduct';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -249,7 +250,7 @@ function App() {
             <Route path="dashboard" element={<VendorDashboard />} />
             <Route path="products" element={<VendorProducts />} />
             <Route path="products/new" element={<AddProduct />} />
-            <Route path="products/edit/:id" element={<div>Edit Product (to be implemented)</div>} />
+            <Route path="products/edit/:id" element={<EditProduct />} />
             <Route path="orders" element={<VendorOrders />} />
             <Route path="orders/:id" element={<VendorOrderDetails />} />
             <Route path="reviews" element={<VendorReviews />} />

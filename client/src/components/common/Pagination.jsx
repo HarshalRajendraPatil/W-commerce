@@ -59,20 +59,20 @@ const Pagination = ({
   const pages = generatePagination();
 
   return (
-    <nav className="flex justify-center mt-6">
-      <ul className="flex items-center space-x-1">
+    <nav className="flex justify-center mt-8" aria-label="Pagination">
+      <ul className="inline-flex items-center -space-x-px rounded-md shadow-sm">
         {/* Previous button */}
         <li>
           <button
             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
-            className={`px-3 py-2 rounded-md ${
+            className={`relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-l-md ${
               currentPage === 1
-                ? 'text-gray-400 cursor-not-allowed'
-                : 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-600'
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-white text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 border border-gray-300'
             }`}
+            aria-label="Previous"
           >
-            <span className="sr-only">Previous</span>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
@@ -84,7 +84,9 @@ const Pagination = ({
           if (page === '...') {
             return (
               <li key={`ellipsis-${index}`}>
-                <span className="px-3 py-2 text-gray-500">...</span>
+                <span className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300">
+                  &#8230;
+                </span>
               </li>
             );
           }
@@ -93,10 +95,10 @@ const Pagination = ({
             <li key={page}>
               <button
                 onClick={() => onPageChange(page)}
-                className={`px-3 py-2 rounded-md ${
+                className={`relative inline-flex items-center px-4 py-2 text-sm font-medium border ${
                   currentPage === page
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-600'
+                    ? 'z-10 bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-600'
+                    : 'bg-white text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 border-gray-300'
                 }`}
               >
                 {page}
@@ -110,13 +112,13 @@ const Pagination = ({
           <button
             onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
-            className={`px-3 py-2 rounded-md ${
+            className={`relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-r-md ${
               currentPage === totalPages
-                ? 'text-gray-400 cursor-not-allowed'
-                : 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-600'
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-white text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 border border-gray-300'
             }`}
+            aria-label="Next"
           >
-            <span className="sr-only">Next</span>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
             </svg>

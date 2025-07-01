@@ -8,12 +8,12 @@ const Product = require('../models/Product');
  */
 exports.getWishlist = async (req, res) => {
   try {
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 8;
+    
     // Find wishlist for the current user or create a new one
-    let wishlist = await Wishlist.findOne({ user: req.user.id })
-      .populate({
-        path: 'products',
-        select: 'name price discountPercentage images averageRating numReviews stockCount'
-      });
+    let wishlist = await Wishlist.findOne({ user: req.user.id });
 
     if (!wishlist) {
       wishlist = await Wishlist.create({ 
@@ -21,11 +21,50 @@ exports.getWishlist = async (req, res) => {
         products: [],
         name: 'My Wishlist'
       });
+      
+      return res.status(200).json({
+        success: true,
+        pagination: {
+          current: 1,
+          total: 1,
+          count: 0
+        },
+        data: []
+      });
     }
-
+    
+    // Get total count of products
+    const totalProducts = wishlist.products.length;
+    
+    // Calculate pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = Math.min(startIndex + limit, totalProducts);
+    
+    // Get paginated product IDs
+    const paginatedProductIds = wishlist.products.slice(startIndex, endIndex);
+    
+    // Fetch product details
+    const products = await Product.find({ _id: { $in: paginatedProductIds } })
+      .select('name price discountPercentage images averageRating numReviews stockCount category');
+    
+    // Create wishlist items with product details
+    const wishlistItems = paginatedProductIds.map(productId => {
+      const product = products.find(p => p._id.toString() === productId.toString());
+      return {
+        _id: productId,
+        product
+      };
+    });
+    
+    // Return paginated results
     res.status(200).json({
       success: true,
-      data: wishlist
+      pagination: {
+        current: page,
+        total: Math.ceil(totalProducts / limit),
+        count: totalProducts
+      },
+      data: wishlistItems
     });
   } catch (error) {
     console.error('Error fetching wishlist:', error);

@@ -4,9 +4,9 @@ import { vendorApi } from '../../api/vendorApi';
 // Async thunks
 export const fetchVendorAnalytics = createAsyncThunk(
   'vendorAnalytics/fetchVendorAnalytics',
-  async (timeFrame, { rejectWithValue }) => {
+  async ({ timeFrame, page = 1, limit = 5 }, { rejectWithValue }) => {
     try {
-      const response = await vendorApi.getVendorAnalytics(timeFrame);
+      const response = await vendorApi.getVendorAnalytics(timeFrame, page, limit);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || { message: error.message });
@@ -35,6 +35,18 @@ const initialState = {
     topProducts: [],
     revenueByCategory: []
   },
+  pagination: {
+    products: {
+      current: 1,
+      total: 1,
+      count: 0
+    },
+    categories: {
+      current: 1,
+      total: 1,
+      count: 0
+    }
+  },
   loading: false,
   error: null,
   timeFrame: '30days'
@@ -47,6 +59,12 @@ const vendorAnalyticsSlice = createSlice({
   reducers: {
     setTimeFrame: (state, action) => {
       state.timeFrame = action.payload;
+    },
+    setProductsPage: (state, action) => {
+      state.pagination.products.current = action.payload;
+    },
+    setCategoriesPage: (state, action) => {
+      state.pagination.categories.current = action.payload;
     }
   },
   extraReducers: (builder) => {
@@ -58,6 +76,9 @@ const vendorAnalyticsSlice = createSlice({
       .addCase(fetchVendorAnalytics.fulfilled, (state, action) => {
         state.loading = false;
         state.data = action.payload.data;
+        if (action.payload.pagination) {
+          state.pagination = action.payload.pagination;
+        }
       })
       .addCase(fetchVendorAnalytics.rejected, (state, action) => {
         state.loading = false;
@@ -66,5 +87,5 @@ const vendorAnalyticsSlice = createSlice({
   }
 });
 
-export const { setTimeFrame } = vendorAnalyticsSlice.actions;
+export const { setTimeFrame, setProductsPage, setCategoriesPage } = vendorAnalyticsSlice.actions;
 export default vendorAnalyticsSlice.reducer; 

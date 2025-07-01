@@ -28,10 +28,14 @@ export const fetchVendorOrderDetails = createAsyncThunk(
 
 export const updateOrderItemFulfillment = createAsyncThunk(
   'vendorOrders/updateOrderItemFulfillment',
-  async ({ orderId, data }, { rejectWithValue }) => {
+  async ({ orderId, data }, { rejectWithValue, dispatch }) => {
     try {
       const response = await vendorApi.updateOrderItemFulfillment(orderId, data);
-      return response.data;
+      // Fetch updated order details to ensure we have the latest data
+      setTimeout(() => {
+        dispatch(fetchVendorOrderDetails(orderId));
+      }, 300);
+      return response;
     } catch (error) {
       return rejectWithValue(error.response?.data || { message: error.message });
     }
@@ -115,12 +119,18 @@ const vendorOrdersSlice = createSlice({
       .addCase(updateOrderItemFulfillment.fulfilled, (state, action) => {
         state.loading = false;
         state.success = true;
-        state.currentOrder = action.payload.data;
+        
+        // Correctly update the current order with the response data
+        if (action.payload && action.payload.data) {
+          state.currentOrder = action.payload.data;
+        }
         
         // Update order in the list if it exists
-        const index = state.orders.findIndex(order => order._id === action.payload.data._id);
-        if (index !== -1) {
-          state.orders[index] = action.payload.data;
+        if (action.payload && action.payload.data && state.orders.length > 0) {
+          const index = state.orders.findIndex(order => order._id === action.payload.data._id);
+          if (index !== -1) {
+            state.orders[index] = action.payload.data;
+          }
         }
       })
       .addCase(updateOrderItemFulfillment.rejected, (state, action) => {

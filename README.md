@@ -13,7 +13,7 @@ The platform includes a comprehensive profile management system with role-specif
 - `DELETE /api/auth/address/:id` - Delete user address
 
 #### Customer-specific Routes
-- `GET /api/orders/myorders` - Get customer's order history
+- `GET /api/orders/my-orders` - Get customer's order history
 - `GET /api/reviews/my` - Get customer's product reviews
 - `GET /api/wishlist` - Get customer's wishlist items
 

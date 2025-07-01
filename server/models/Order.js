@@ -31,7 +31,15 @@ const OrderSchema = new mongoose.Schema(
             value: String
           }
         ],
-        total: Number
+        total: Number,
+        fulfillmentStatus: {
+          type: String,
+          enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
+          default: 'pending'
+        },
+        trackingInfo: String,
+        shippedAt: Date,
+        deliveredAt: Date
       }
     ],
     shippingAddress: {
@@ -147,9 +155,6 @@ const OrderSchema = new mongoose.Schema(
       }
     ],
     trackingNumber: String,
-    deliveredAt: {
-      type: Date
-    },
     cancelledAt: {
       type: Date
     },
@@ -174,6 +179,30 @@ OrderSchema.pre('save', function (next) {
       updatedAt: Date.now()
     });
   }
+  
+  // Check if all items are shipped, update order status to shipped
+  if (this.items && this.items.length > 0) {
+    const allItemsShipped = this.items.every(item => item.fulfillmentStatus === 'shipped');
+    if (allItemsShipped && this.status !== 'shipped') {
+      this.status = 'shipped';
+      this.statusUpdates.push({
+        status: 'shipped',
+        updatedAt: Date.now(),
+        note: 'All items have been shipped'
+      });
+    }
+    
+    const allItemsDelivered = this.items.every(item => item.fulfillmentStatus === 'delivered');
+    if (allItemsDelivered && this.status !== 'delivered') {
+      this.status = 'delivered';
+      this.statusUpdates.push({
+        status: 'delivered',
+        updatedAt: Date.now(),
+        note: 'All items have been delivered'
+      });
+    }
+  }
+  
   next();
 });
 

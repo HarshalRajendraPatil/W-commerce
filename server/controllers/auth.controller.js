@@ -571,7 +571,8 @@ exports.getProfile = async (req, res, next) => {
       const totalSpent = orders.reduce((sum, order) => sum + order.totalPrice, 0);
       
       // Get wishlist count
-      const wishlistCount = await Wishlist.countDocuments({ user: req.user.id });
+      const wishlist = await Wishlist.findOne({ user: req.user._id });
+      const wishlistCount = wishlist?.products?.length ?? 0;
       
       // Get review count
       const reviewCount = await Review.countDocuments({ user: req.user.id });

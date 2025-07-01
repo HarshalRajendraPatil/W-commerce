@@ -210,7 +210,7 @@ const Customers = () => {
             </div>
             <div className="ml-4">
               <h3 className="text-sm font-medium text-gray-500">Total Admins</h3>
-              <p className="text-2xl font-bold mt-1">{userAnalytics?.usersByRole?.[0]?.count || 0}</p>
+              <p className="text-2xl font-bold mt-1">{userAnalytics?.usersByRole?.[1]?.count || 0}</p>
             </div>
           </div>
         </div>
@@ -222,7 +222,7 @@ const Customers = () => {
             </div>
             <div className="ml-4">
               <h3 className="text-sm font-medium text-gray-500">Total Vendors</h3>
-              <p className="text-2xl font-bold mt-1">{userAnalytics?.usersByRole?.[1]?.count || 0}</p>
+              <p className="text-2xl font-bold mt-1">{userAnalytics?.usersByRole?.[0]?.count || 0}</p>
             </div>
           </div>
         </div>

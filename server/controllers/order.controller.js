@@ -106,7 +106,8 @@ exports.createOrder = async (req, res, next) => {
         quantity: cartItem.quantity,
         price: productPrice,
         selectedVariants: cartItem.selectedVariants || [],
-        total: itemTotal
+        total: itemTotal,
+        fulfillmentStatus: 'pending'
       });
     }
     
@@ -1260,27 +1261,30 @@ exports.updateOrderItemFulfillment = async (req, res, next) => {
       }
     }
     
-    // Check if all items have the same status to update the overall order status
-    const allItemsFulfillmentStatus = order.items.map(item => item.fulfillmentStatus);
-    const isUniform = allItemsFulfillmentStatus.every(status => status === fulfillmentStatus);
-    
-    if (isUniform) {
-      order.status = fulfillmentStatus;
-      
-      if (fulfillmentStatus === 'shipped') {
-        order.shippedAt = Date.now();
-      }
-      
-      if (fulfillmentStatus === 'delivered') {
-        order.deliveredAt = Date.now();
-      }
-    }
-    
+    // Save the order - the pre-save hook will handle updating the order status if needed
     await order.save();
+    
+    // Fetch the updated order to return
+    const updatedOrder = await Order.findById(req.params.id).populate({
+      path: 'user',
+      select: 'name email phone'
+    });
+    
+    // Filter items to only include this vendor's products for the response
+    const orderObj = updatedOrder.toObject();
+    orderObj.items = orderObj.items.filter(item => 
+      vendorProductIds.includes(item.product.toString())
+    );
+    
+    // Calculate vendor's subtotal for this order
+    orderObj.vendorSubtotal = orderObj.items.reduce(
+      (sum, item) => sum + (item.price * item.quantity), 
+      0
+    );
     
     res.status(200).json({
       success: true,
-      data: order
+      data: orderObj
     });
   } catch (error) {
     next(error);

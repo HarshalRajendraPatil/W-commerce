@@ -540,28 +540,6 @@ const Reviews = () => {
                         <FiX className="mr-1" /> Reject
                       </button>
                     )}
-                    
-                    {/* If already approved, show option to reject */}
-                    {review.isApproved && (
-                      <button 
-                        onClick={() => openRejectModal(review)}
-                        disabled={actionLoading}
-                        className="inline-flex items-center px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded hover:bg-yellow-200"
-                      >
-                        <FiX className="mr-1" /> Mark as Rejected
-                      </button>
-                    )}
-                    
-                    {/* If already rejected, show option to approve */}
-                    {review.isRejected && (
-                      <button 
-                        onClick={() => handleApprove(review._id)}
-                        disabled={actionLoading}
-                        className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded hover:bg-blue-200"
-                      >
-                        <FiCheck className="mr-1" /> Mark as Approved
-                      </button>
-                    )}
                   </div>
                 </li>
               ))}

@@ -117,6 +117,14 @@ export const vendorApplicationSlice = createSlice({
       state.isSuccess = false;
       state.isError = false;
       state.message = '';
+    },
+    resetApplicationData: (state) => {
+      // Clear application data to allow reapplication
+      state.myApplication = null;
+      state.isLoading = false;
+      state.isSuccess = false;
+      state.isError = false;
+      state.message = '';
     }
   },
   extraReducers: (builder) => {
@@ -223,5 +231,5 @@ export const vendorApplicationSlice = createSlice({
   }
 });
 
-export const { reset } = vendorApplicationSlice.actions;
+export const { reset, resetApplicationData } = vendorApplicationSlice.actions;
 export default vendorApplicationSlice.reducer; 

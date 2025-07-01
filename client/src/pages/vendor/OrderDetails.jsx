@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
 import { 
   fetchVendorOrderDetails, 
-  updateOrderItemFulfillment 
+  updateOrderItemFulfillment,
+  clearCurrentOrder,
+  resetOrderState
 } from '../../redux/slices/vendorOrdersSlice';
-import VendorLayout from '../../components/vendor/VendorLayout';
 
 const VendorOrderDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const { currentOrder, detailsLoading, loading, error, success } = useSelector(state => state.vendorOrders);
   
@@ -19,15 +22,38 @@ const VendorOrderDetails = () => {
   
   useEffect(() => {
     dispatch(fetchVendorOrderDetails(id));
+    
+    // Clear current order when component unmounts
+    return () => {
+      dispatch(clearCurrentOrder());
+    };
   }, [dispatch, id]);
   
+  // Function to refresh order data
+  const refreshOrderDetails = () => {
+    dispatch(fetchVendorOrderDetails(id));
+    toast.info('Refreshing order details...');
+  };
+  
+  // Handle success and error states
   useEffect(() => {
     if (success) {
+      toast.success('Order fulfillment status updated successfully!');
       setShowFulfillmentModal(false);
       setSelectedItems([]);
       setTrackingInfo('');
+      
+      // Reset success state after showing the toast
+      setTimeout(() => {
+        dispatch(resetOrderState());
+      }, 500);
     }
-  }, [success]);
+    
+    if (error) {
+      toast.error(error || 'Failed to update fulfillment status');
+      dispatch(resetOrderState());
+    }
+  }, [success, error, dispatch]);
   
   const handleItemSelection = (itemId) => {
     if (selectedItems.includes(itemId)) {
@@ -47,7 +73,7 @@ const VendorOrderDetails = () => {
   
   const openFulfillmentModal = () => {
     if (selectedItems.length === 0) {
-      alert('Please select at least one item to update');
+      toast.warning('Please select at least one item to update');
       return;
     }
     setShowFulfillmentModal(true);
@@ -81,48 +107,67 @@ const VendorOrderDetails = () => {
     }
   };
   
+  const handleGoBack = () => {
+    navigate('/vendor/orders');
+  };
+
+  const closeModal = () => {
+    setShowFulfillmentModal(false);
+  };
+  
   if (detailsLoading) {
     return (
-      <VendorLayout>
-        <div className="flex justify-center my-10">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        <div className="flex flex-col items-center justify-center my-20">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500 mb-4"></div>
+          <p className="text-gray-600">Loading order details...</p>
         </div>
-      </VendorLayout>
     );
   }
   
-  if (error) {
-    return (
-      <VendorLayout>
+  if (error && !currentOrder) {
+    return (<>
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
           {error}
         </div>
-      </VendorLayout>
+        <button
+          onClick={handleGoBack}
+          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+          &larr; Back to Orders
+        </button>
+    </>
     );
   }
+
+
+
   
   if (!currentOrder) {
     return (
-      <VendorLayout>
         <div className="text-center py-10">
           <h3 className="mt-2 text-sm font-medium text-gray-900">Order not found</h3>
+          <button
+            onClick={handleGoBack}
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            &larr; Back to Orders
+          </button>
         </div>
-      </VendorLayout>
     );
   }
   
   return (
-    <VendorLayout>
+    <>
       <div className="bg-white p-6 rounded-lg shadow-md">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
           <div>
             <div className="flex items-center gap-4">
-              <Link
-                to="/vendor/orders"
+              <button
+                onClick={handleGoBack}
                 className="text-indigo-600 hover:text-indigo-900"
               >
                 &larr; Back to Orders
-              </Link>
+              </button>
               <h1 className="text-2xl font-semibold text-gray-800">
                 Order #{currentOrder.trackingNumber}
               </h1>
@@ -135,7 +180,7 @@ const VendorOrderDetails = () => {
             </p>
           </div>
           
-          <div className="mt-4 md:mt-0">
+          <div className="mt-4 md:mt-0 flex space-x-2">
             <button
               onClick={openFulfillmentModal}
               disabled={selectedItems.length === 0}
@@ -144,6 +189,15 @@ const VendorOrderDetails = () => {
               }`}
             >
               Update Fulfillment
+            </button>
+            <button
+              onClick={refreshOrderDetails}
+              className="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 active:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
             </button>
           </div>
         </div>
@@ -226,7 +280,7 @@ const VendorOrderDetails = () => {
                   <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <input
                       type="checkbox"
-                      checked={selectedItems.length === currentOrder?.items.length}
+                      checked={selectedItems.length === currentOrder?.items.length && currentOrder?.items.length > 0}
                       onChange={handleSelectAll}
                       className="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded"
                     />
@@ -250,6 +304,7 @@ const VendorOrderDetails = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentOrder.items.map((item) => (
+                  console.log(item),
                   <tr key={item._id}>
                     <td className="px-3 py-4 whitespace-nowrap">
                       <input
@@ -318,11 +373,24 @@ const VendorOrderDetails = () => {
       
       {/* Fulfillment Modal */}
       {showFulfillmentModal && (
-        <div className="fixed inset-0 z-10 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 backdrop-blur-sm transition-opacity" onClick={closeModal} aria-hidden="true"></div>
+            
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative">
+              <div className="absolute top-0 right-0 pt-4 pr-4">
+                <button
+                  type="button"
+                  className="bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  onClick={closeModal}
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
@@ -347,7 +415,7 @@ const VendorOrderDetails = () => {
                       <select
                         id="fulfillmentStatus"
                         name="fulfillmentStatus"
-                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                         value={fulfillmentStatus}
                         onChange={(e) => setFulfillmentStatus(e.target.value)}
                       >
@@ -390,7 +458,7 @@ const VendorOrderDetails = () => {
                 <button
                   type="button"
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => setShowFulfillmentModal(false)}
+                  onClick={closeModal}
                   disabled={loading}
                 >
                   Cancel
@@ -400,7 +468,7 @@ const VendorOrderDetails = () => {
           </div>
         </div>
       )}
-    </VendorLayout>
+    </>
   );
 };
 

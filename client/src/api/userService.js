@@ -90,19 +90,19 @@ const deleteAddress = async (addressId) => {
 
 // Get orders for customer profile
 const getMyOrders = async (page = 1, limit = 5) => {
-  const response = await axios.get(`/orders/myorders?page=${page}&limit=${limit}`);
+  const response = await axios.get(`/orders/my-orders?page=${page}&limit=${limit}`);
   return response.data;
 };
 
 // Get wishlist items
-const getWishlist = async () => {
-  const response = await axios.get('/wishlist');
+const getWishlist = async (page = 1, limit = 5) => {
+  const response = await axios.get(`/wishlist?page=${page}&limit=${limit}`);
   return response.data;
 };
 
 // Get reviews written by user
-const getMyReviews = async () => {
-  const response = await axios.get('/reviews/my');
+const getMyReviews = async (page = 1, limit = 5) => {
+  const response = await axios.get(`/reviews/my?page=${page}&limit=${limit}`);
   return response.data;
 };
 

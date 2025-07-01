@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchVendorAnalytics, setTimeFrame } from '../../redux/slices/vendorAnalyticsSlice';
+import { 
+  fetchVendorAnalytics, 
+  setTimeFrame,
+  setProductsPage,
+  setCategoriesPage
+} from '../../redux/slices/vendorAnalyticsSlice';
+import Pagination from '../../components/common/Pagination';
 import { 
   LineChart, 
   Line, 
@@ -16,14 +22,36 @@ import {
 
 const VendorAnalytics = () => {
   const dispatch = useDispatch();
-  const { data, loading, error, timeFrame } = useSelector(state => state.vendorAnalytics);
+  const { 
+    data, 
+    loading, 
+    error, 
+    timeFrame,
+    pagination 
+  } = useSelector(state => state.vendorAnalytics);
   
   useEffect(() => {
-    dispatch(fetchVendorAnalytics(timeFrame));
-  }, [dispatch, timeFrame]);
+    loadAnalytics();
+  }, [dispatch, timeFrame, pagination.products.current, pagination.categories.current]);
+  
+  const loadAnalytics = () => {
+    dispatch(fetchVendorAnalytics({
+      timeFrame,
+      page: pagination.products.current,
+      limit: 5
+    }));
+  };
   
   const handleTimeFrameChange = (newTimeFrame) => {
     dispatch(setTimeFrame(newTimeFrame));
+  };
+  
+  const handleProductsPageChange = (page) => {
+    dispatch(setProductsPage(page));
+  };
+  
+  const handleCategoriesPageChange = (page) => {
+    dispatch(setCategoriesPage(page));
   };
   
   const formatCurrency = (value) => {
@@ -231,49 +259,68 @@ const VendorAnalytics = () => {
               <h2 className="text-lg font-medium text-gray-800 mb-4">Top Products</h2>
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 {data?.topProducts?.length > 0 ? (
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Product
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Revenue
-                        </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quantity
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {data.topProducts.map((product, index) => (
-                        <tr key={product.id || index}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0 h-10 w-10">
-                                <img
-                                  className="h-10 w-10 rounded-full object-cover"
-                                  src={product.image || 'https://via.placeholder.com/40'}
-                                  alt={product.name}
-                                />
-                              </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {product.name}
+                  <>
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Product
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Revenue
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Quantity
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {data.topProducts.map((product, index) => (
+                          <tr key={product.id || index}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="flex-shrink-0 h-10 w-10">
+                                  <img
+                                    className="h-10 w-10 rounded-full object-cover"
+                                    src={product.image || 'https://via.placeholder.com/40'}
+                                    alt={product.name}
+                                  />
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {product.name}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatCurrency(product.revenue)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {product.quantity}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {formatCurrency(product.revenue)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {product.quantity}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    
+                    {/* Pagination for Products */}
+                    {pagination?.products?.total > 1 && (
+                      <div className="py-3 px-6 border-t border-gray-200">
+                        <div className="flex justify-between items-center mb-2">
+                          <p className="text-sm text-gray-700">
+                            Showing <span className="font-medium">{data.topProducts.length}</span> of{' '}
+                            <span className="font-medium">{pagination.products.count}</span> products
+                          </p>
+                        </div>
+                        <Pagination
+                          currentPage={pagination.products.current}
+                          totalPages={pagination.products.total}
+                          onPageChange={handleProductsPageChange}
+                        />
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="p-6 text-center text-gray-500">
                     No top products data available
@@ -307,6 +354,23 @@ const VendorAnalytics = () => {
                     </div>
                   )}
                 </div>
+                
+                {/* Pagination for Categories */}
+                {pagination?.categories?.total > 1 && (
+                  <div className="mt-4 border-t border-gray-200 pt-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-sm text-gray-700">
+                        Showing <span className="font-medium">{categoryChartData.length}</span> of{' '}
+                        <span className="font-medium">{pagination.categories.count}</span> categories
+                      </p>
+                    </div>
+                    <Pagination
+                      currentPage={pagination.categories.current}
+                      totalPages={pagination.categories.total}
+                      onPageChange={handleCategoriesPageChange}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -16,6 +16,10 @@ export const vendorApi = {
     return axios.get(`/products/vendor/products?${queryParams.toString()}`);
   },
   
+  getProductById: (id) => {
+    return axios.get(`/products/${id}`);
+  },
+  
   createProduct: (productData) => {
     return axios.post('/products', productData, {
       headers: {
@@ -25,7 +29,11 @@ export const vendorApi = {
   },
   
   updateProduct: (id, productData) => {
-    return axios.put(`/products/${id}`, productData);
+    return axios.put(`/products/${id}`, productData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
   },
   
   deleteProduct: (id) => {
@@ -59,8 +67,13 @@ export const vendorApi = {
     return axios.get(`/orders/vendor/${id}`);
   },
   
-  updateOrderItemFulfillment: (orderId, data) => {
-    return axios.patch(`/orders/${orderId}/fulfill`, data);
+  updateOrderItemFulfillment: async (orderId, data) => {
+    try {
+      const response = await axios.patch(`/orders/${orderId}/fulfill`, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
   },
   
   // Review management
@@ -105,7 +118,12 @@ export const vendorApi = {
     return axios.get('/dashboard/vendor/recent-reviews');
   },
   
-  getVendorAnalytics: (timeFrame = '30days') => {
-    return axios.get(`/dashboard/vendor/analytics?timeFrame=${timeFrame}`);
+  getVendorAnalytics: (timeFrame = '30days', page = 1, limit = 5) => {
+    const queryParams = new URLSearchParams();
+    queryParams.append('timeFrame', timeFrame);
+    queryParams.append('page', page);
+    queryParams.append('limit', limit);
+    
+    return axios.get(`/dashboard/vendor/analytics?${queryParams.toString()}`);
   }
 }; 

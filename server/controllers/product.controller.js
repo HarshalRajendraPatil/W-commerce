@@ -426,18 +426,182 @@ exports.updateProduct = async (req, res, next) => {
       }
     }
     
-    // Update the product
-    product = await Product.findByIdAndUpdate(
-      req.params.id, 
-      req.body, 
-      { new: true, runValidators: true }
-    );
+    // Parse JSON strings for array fields if they are strings
+    const updateData = { ...req.body };
+    
+    // Parse specifications if it's a string
+    if (typeof updateData.specifications === 'string') {
+      try {
+        updateData.specifications = JSON.parse(updateData.specifications);
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid specifications format'
+        });
+      }
+    }
+    
+    // Parse variants if it's a string
+    if (typeof updateData.variants === 'string') {
+      try {
+        updateData.variants = JSON.parse(updateData.variants);
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid variants format'
+        });
+      }
+    }
+    
+    // Parse tags if it's a string
+    if (typeof updateData.tags === 'string') {
+      try {
+        updateData.tags = JSON.parse(updateData.tags);
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid tags format'
+        });
+      }
+    }
+    
+    // Handle existing images data if provided
+    if (typeof updateData.existingImages === 'string') {
+      try {
+        const existingImagesData = JSON.parse(updateData.existingImages);
+        
+        // Update existing images with new data (alt text, primary status)
+        const updatedImages = product.images.map(img => {
+          const updatedImageData = existingImagesData.find(
+            imgData => imgData._id === img._id.toString()
+          );
+          
+          if (updatedImageData) {
+            return {
+              ...img.toObject(),
+              alt: updatedImageData.alt || img.alt,
+              isPrimary: updatedImageData.isPrimary || false
+            };
+          }
+          return img;
+        });
+        
+        product.images = updatedImages;
+        
+        // Remove existingImages from updateData as we've processed it
+        delete updateData.existingImages;
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid existing images format'
+        });
+      }
+    }
+    
+    // Handle images to delete if provided
+    if (typeof updateData.imagesToDelete === 'string') {
+      try {
+        const imagesToDelete = JSON.parse(updateData.imagesToDelete);
+        
+        // Filter out images that should be deleted
+        product.images = product.images.filter(img => 
+          !imagesToDelete.includes(img._id.toString())
+        );
+        
+        // Delete images from cloudinary
+        for (const imageId of imagesToDelete) {
+          const image = product.images.find(img => img._id.toString() === imageId);
+          if (image && image.publicId) {
+            await cloudinary.removeFromCloudinary(image.publicId);
+          }
+        }
+        
+        // Remove imagesToDelete from updateData as we've processed it
+        delete updateData.imagesToDelete;
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid images to delete format'
+        });
+      }
+    }
+    
+    // Handle new image uploads if provided
+    if (req.files && req.files.newImages) {
+      const files = Array.isArray(req.files.newImages) 
+        ? req.files.newImages 
+        : [req.files.newImages];
+      
+      // Validate file types and sizes
+      for (const file of files) {
+        if (!file.mimetype.startsWith('image')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Please upload image files only'
+          });
+        }
+        
+        if (file.size > 2 * 1024 * 1024) {
+          return res.status(400).json({
+            success: false,
+            message: 'Image size should be less than 2MB'
+          });
+        }
+      }
+      
+      // Process and upload each new image
+      const primaryIndex = req.body.primaryImageIndex 
+        ? parseInt(req.body.primaryImageIndex) 
+        : null;
+      
+      const currentImagesCount = product.images.length;
+      
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const result = await cloudinary.uploadToCloudinary(file.tempFilePath, 'products');
+        
+        // Get alt text for this image if provided
+        const altText = req.body[`imageAlt_${i}`] || product.name || 'Product image';
+        
+        // Check if this should be the primary image
+        const isPrimary = primaryIndex === currentImagesCount + i;
+        
+        // If this is the new primary, set all others to false
+        if (isPrimary) {
+          product.images.forEach(img => {
+            img.isPrimary = false;
+          });
+        }
+        
+        // Add the new image
+        product.images.push({
+          url: result.secure_url,
+          publicId: result.public_id,
+          alt: altText,
+          isPrimary: isPrimary
+        });
+      }
+      
+      // Remove primaryImageIndex from updateData as we've processed it
+      delete updateData.primaryImageIndex;
+    }
+    
+    // Update the product with remaining fields
+    Object.keys(updateData).forEach(key => {
+      if (key !== 'images') { // Skip images as we've handled them separately
+        product[key] = updateData[key];
+      }
+    });
+    
+    // Save the updated product
+    await product.save();
     
     res.status(200).json({
       success: true,
       data: product
     });
   } catch (err) {
+    console.error('Product update error:', err);
     next(err);
   }
 };
