@@ -62,23 +62,21 @@ const ProductList = () => {
   const handleFilterChange = (newFilters) => {
     // Reset page when filters change
     newFilters.page = 1;
-
-    if(newFilters.minPrice) {
-      newFilters.minPrice = Number(newFilters.minPrice);
-    }
-
-    if(newFilters.maxPrice) {
-      newFilters.maxPrice = Number(newFilters.maxPrice);
-    }
-
     
-    // Update URL with new filters
-    const params = new URLSearchParams();
+    // Clean up filters - remove empty values
+    const cleanedFilters = {};
     
     Object.entries(newFilters).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
+      if (value !== '' && value !== null && value !== undefined) {
+        cleanedFilters[key] = value;
       }
+    });
+    
+    // Update URL with cleaned filters
+    const params = new URLSearchParams();
+    
+    Object.entries(cleanedFilters).forEach(([key, value]) => {
+      params.set(key, value);
     });
     
     setSearchParams(params);
@@ -90,13 +88,20 @@ const ProductList = () => {
     const filters = getFiltersFromUrl();
     filters.page = newPage;
     
-    // Update URL with new filters
-    const params = new URLSearchParams();
+    // Clean up filters - remove empty values
+    const cleanedFilters = {};
     
     Object.entries(filters).forEach(([key, value]) => {
-      if (value) {
-        params.set(key, value);
+      if (value !== '' && value !== null && value !== undefined) {
+        cleanedFilters[key] = value;
       }
+    });
+    
+    // Update URL with cleaned filters
+    const params = new URLSearchParams();
+    
+    Object.entries(cleanedFilters).forEach(([key, value]) => {
+      params.set(key, value);
     });
     
     setSearchParams(params);

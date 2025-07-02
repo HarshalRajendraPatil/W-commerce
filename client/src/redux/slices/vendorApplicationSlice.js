@@ -35,6 +35,14 @@ export const getMyApplicationStatus = createAsyncThunk(
     try {
       return await vendorApplicationService.getMyApplicationStatus();
     } catch (error) {
+      // If the error is "No application found", don't treat it as an error
+      // This is an expected case for users who haven't applied yet
+      if (error.response?.status === 404 && 
+          error.response?.data?.message === 'No application found') {
+        // Return a valid response with null data instead of rejecting
+        return { success: true, data: null };
+      }
+      
       const message = 
         error.response?.data?.message || 
         error.message || 
@@ -155,8 +163,11 @@ export const vendorApplicationSlice = createSlice({
       })
       .addCase(getMyApplicationStatus.rejected, (state, action) => {
         state.isLoading = false;
-        state.isError = true;
-        state.message = action.payload;
+        // Only set error state if it's not the "No application found" case
+        if (action.payload !== 'No application found') {
+          state.isError = true;
+          state.message = action.payload;
+        }
       })
       
       // Get all applications

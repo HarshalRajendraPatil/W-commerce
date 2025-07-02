@@ -14,7 +14,8 @@ const {
   trackOrder,
   getVendorOrders,
   getVendorOrderDetails,
-  updateOrderItemFulfillment
+  updateOrderItemFulfillment,
+  prepareOrder
 } = require('../controllers/order.controller');
 const dashboardController = require('../controllers/dashboard.controller');
 
@@ -27,6 +28,7 @@ router.use(protect);
 
 // Customer routes
 router.post('/', createOrder);
+router.post('/prepare', prepareOrder);
 router.get('/my-orders', getOrdersByUser);
 router.get('/analytics', authorize('admin'), getOrderAnalytics);
 router.get('/vendor', authorize('vendor'), getVendorOrders);

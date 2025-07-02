@@ -14,6 +14,17 @@ export const createOrder = createAsyncThunk(
   }
 );
 
+export const prepareOrder = createAsyncThunk(
+  'order/prepareOrder',
+  async (orderData, { rejectWithValue }) => {
+    try {
+      return await orderService.prepareOrder(orderData);
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to prepare order');
+    }
+  }
+);
+
 export const getMyOrders = createAsyncThunk(
   'order/getMyOrders',
   async ({ page, limit }, { rejectWithValue }) => {
@@ -60,9 +71,9 @@ export const cancelOrder = createAsyncThunk(
 
 export const createRazorpayOrder = createAsyncThunk(
   'order/createRazorpayOrder',
-  async (orderId, { rejectWithValue }) => {
+  async (orderData, { rejectWithValue }) => {
     try {
-      return await orderService.createRazorpayOrder(orderId);
+      return await orderService.createRazorpayOrder(orderData);
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create payment order');
     }
@@ -143,6 +154,7 @@ export const fetchOrderAnalytics = createAsyncThunk(
 const initialState = {
   orders: [],
   currentOrder: null,
+  preparedOrderData: null,
   trackingInfo: null,
   paymentInfo: null,
   analytics: null,
@@ -177,6 +189,7 @@ const orderSlice = createSlice({
     },
     resetOrderState: (state) => {
       state.currentOrder = null;
+      state.preparedOrderData = null;
       state.trackingInfo = null;
       state.paymentInfo = null;
       state.error = null;
@@ -198,6 +211,21 @@ const orderSlice = createSlice({
         state.successMessage = 'Order created successfully';
       })
       .addCase(createOrder.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      
+      // Prepare Order
+      .addCase(prepareOrder.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(prepareOrder.fulfilled, (state, action) => {
+        state.loading = false;
+        state.preparedOrderData = action.payload.data.orderData;
+        state.success = true;
+      })
+      .addCase(prepareOrder.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

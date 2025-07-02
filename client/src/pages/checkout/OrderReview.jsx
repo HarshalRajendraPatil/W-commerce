@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
-import { createOrder, createRazorpayOrder, processPayment } from '../../redux/slices/orderSlice';
+import { createOrder, prepareOrder, createRazorpayOrder, processPayment } from '../../redux/slices/orderSlice';
 import { clearCart } from '../../redux/slices/cartSlice';
 
 const OrderReview = ({ checkoutData, onBack }) => {
@@ -10,9 +10,9 @@ const OrderReview = ({ checkoutData, onBack }) => {
   const dispatch = useDispatch();
   const { cart } = useSelector(state => state.cart);
   const { user } = useSelector(state => state.auth);
+  const { preparedOrderData } = useSelector(state => state.order);
   
   const [isProcessing, setIsProcessing] = useState(false);
-  const [orderId, setOrderId] = useState(null);
   
   // Load Razorpay script
   useEffect(() => {
@@ -53,18 +53,16 @@ const OrderReview = ({ checkoutData, onBack }) => {
     }
     
     setIsProcessing(true);
-
-    console.log(cart);
     
     try {
       // Calculate values
       const subtotal = cart.totalPrice;
       const taxPrice = subtotal * 0.18; // 18% tax
-      const shippingPrice = 10; // Free shipping
+      const shippingPrice = 10; // Fixed shipping price
       const discountAmount = cart.discountAmount || 0;
       const totalPrice = subtotal + taxPrice - discountAmount;
       
-      // 1. Create an order first
+      // 1. Prepare order data without saving to database
       const orderData = {
         items: cart.items.map(item => ({
           product: item.product._id,
@@ -78,20 +76,18 @@ const OrderReview = ({ checkoutData, onBack }) => {
         couponCode: cart.coupon?.code,
         itemsPrice: subtotal,
         taxPrice: taxPrice,
-        shippingPrice: shippingPrice,
+        shippingPrice: 10,
         totalPrice: totalPrice,
         discountAmount: discountAmount
       };
       
-      const orderResult = await dispatch(createOrder(orderData)).unwrap();
-      const newOrderId = orderResult.data._id;
-      setOrderId(newOrderId);
+      // Prepare the order (doesn't create in database yet)
+      const prepareResult = await dispatch(prepareOrder(orderData)).unwrap();
+      const preparedOrderData = prepareResult.data.orderData;
       
       // 2. Create Razorpay order
-      const razorpayResult = await dispatch(createRazorpayOrder(newOrderId)).unwrap();
+      const razorpayResult = await dispatch(createRazorpayOrder(preparedOrderData)).unwrap();
       const { orderId: razorpayOrderId, amount, currency } = razorpayResult.data;
-
-      console.log("razorpayResult", razorpayResult);
       
       // 3. Open Razorpay payment form
       const options = {
@@ -99,29 +95,26 @@ const OrderReview = ({ checkoutData, onBack }) => {
         amount: amount,
         currency: currency,
         name: 'W-Commerce',
-        description: `Order #${newOrderId}`,
+        description: 'Order Payment',
         order_id: razorpayOrderId,
         handler: async function(response) {
           // Process payment when completed
-          console.log("response", response);
           try {
             const paymentData = {
-              orderId: newOrderId,
+              orderData: preparedOrderData,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpayOrderId: response.razorpay_order_id,
               razorpaySignature: response.razorpay_signature
             };
-
-            console.log("paymentData", paymentData);
             
-            await dispatch(processPayment(paymentData)).unwrap();
+            const paymentResult = await dispatch(processPayment(paymentData)).unwrap();
             dispatch(clearCart());
             
             // Show success message
             toast.success('Payment successful! Your order has been placed.');
             
             // Immediately redirect to order success page
-            navigate(`/order-success/${newOrderId}`);
+            navigate(`/order-success/${paymentResult.data._id}`);
           } catch (error) {
             console.error("Payment verification failed:", error);
             toast.error('Payment verification failed. Please contact support.');
@@ -190,51 +183,48 @@ const OrderReview = ({ checkoutData, onBack }) => {
         </div>
         
         {/* Payment Security Information */}
-        <div className="bg-blue-50 p-4 rounded-md">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+        <div className="text-sm text-gray-500">
+          <p>
+            <span className="inline-block align-middle mr-1">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-blue-700">
-                You'll be redirected to Razorpay's secure payment gateway to complete your purchase after clicking "Place Order".
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="flex justify-between items-center mt-8">
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={isProcessing}
-          className="text-indigo-600 hover:text-indigo-800 font-medium disabled:opacity-50"
-        >
-          ← Back to Shipping
-        </button>
-        <button
-          type="button"
-          onClick={handlePlaceOrder}
-          disabled={isProcessing}
-          className={`bg-indigo-600 text-white py-3 px-6 rounded-md hover:bg-indigo-700 transition-colors ${
-            isProcessing ? 'opacity-70 cursor-not-allowed' : ''
-          }`}
-        >
-          {isProcessing ? (
-            <span className="flex items-center">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Processing...
             </span>
-          ) : (
-            'Place Order'
-          )}
-        </button>
+            Your payment information is secure. We use encrypted connections to protect your data.
+          </p>
+        </div>
+        
+        {/* Actions */}
+        <div className="flex justify-between pt-4">
+          <button
+            type="button"
+            onClick={onBack}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+            disabled={isProcessing}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={handlePlaceOrder}
+            className={`px-4 py-2 rounded-md text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+              isProcessing ? 'opacity-75 cursor-not-allowed' : ''
+            }`}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <span className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </span>
+            ) : (
+              'Place Order'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

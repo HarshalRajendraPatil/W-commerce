@@ -6,7 +6,7 @@ const ProductFilter = ({ initialFilters = {}, onFilterChange }) => {
   const [filters, setFilters] = useState({
     category: initialFilters.category || '',
     subCategory: initialFilters.subCategory || '',
-    minPrice: initialFilters.minPrice || "",
+    minPrice: initialFilters.minPrice || '',
     maxPrice: initialFilters.maxPrice || '',
     sort: initialFilters.sort || '-createdAt',
     ...initialFilters
@@ -36,21 +36,28 @@ const ProductFilter = ({ initialFilters = {}, onFilterChange }) => {
       [name]: value
     }));
     
-    // Notify parent component
-    onFilterChange({
-      ...filters,
-      [name]: value
-    });
+    // For most filters, apply immediately
+    if (name !== 'minPrice' && name !== 'maxPrice') {
+      onFilterChange({
+        ...filters,
+        [name]: value
+      });
+    }
   };
 
   // Handle price range input
   const handlePriceChange = (e) => {
     const { name, value } = e.target;
     
-    // Only allow numbers or empty string
-    if (value === '' || /^\d+$/.test(value)) {
+    // Only allow numbers and decimal point
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
       handleFilterChange(e);
     }
+  };
+
+  // Apply price filter
+  const applyPriceFilter = () => {
+    onFilterChange(filters);
   };
 
   // Handle clear filters
@@ -98,25 +105,34 @@ const ProductFilter = ({ initialFilters = {}, onFilterChange }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Price Range
           </label>
-          <div className="flex items-center flex-col space-x-2">
-            <input
-              type="text"
-              name="minPrice"
-              placeholder="Min"
-              value={filters.minPrice}
-              onChange={handlePriceChange}
-              className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-            <span className="text-gray-500">to</span>
-            <input
-              type="text"
-              name="maxPrice"
-              placeholder="Max"
-              value={filters.maxPrice}
-              onChange={handlePriceChange}
-              className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <input
+                type="text"
+                name="minPrice"
+                placeholder="Min Price"
+                value={filters.minPrice}
+                onChange={handlePriceChange}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <input
+                type="text"
+                name="maxPrice"
+                placeholder="Max Price"
+                value={filters.maxPrice}
+                onChange={handlePriceChange}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
           </div>
+          <button
+            onClick={applyPriceFilter}
+            className="w-full bg-indigo-100 text-indigo-700 py-1 px-4 rounded-md hover:bg-indigo-200 transition-colors text-sm"
+          >
+            Apply Price Filter
+          </button>
         </div>
         
         {/* Sort Filter */}

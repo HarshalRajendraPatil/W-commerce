@@ -1,4 +1,5 @@
 import React from 'react';
+import { FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 const Pagination = ({ 
   currentPage, 
@@ -59,73 +60,74 @@ const Pagination = ({
   const pages = generatePagination();
 
   return (
-    <nav className="flex justify-center" aria-label="Pagination">
-      <ul className="inline-flex items-center space-x-1">
+    <nav className="flex justify-center items-center" aria-label="Pagination">
+      <div className="inline-flex items-center bg-white shadow-sm rounded-lg border border-gray-200">
         {/* Previous button */}
-        <li>
-          <button
-            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className={`relative inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
-              currentPage === 1
-                ? 'text-gray-400 cursor-not-allowed bg-gray-100'
-                : 'text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1'
-            }`}
-            aria-label="Previous"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </li>
+        <button
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className={`flex items-center justify-center h-10 px-4 rounded-l-lg transition-colors ${
+            currentPage === 1
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-inset'
+          }`}
+          aria-label="Previous page"
+        >
+          <FiChevronLeft className="h-5 w-5" />
+          <span className="sr-only md:not-sr-only md:ml-2 text-sm font-medium">Previous</span>
+        </button>
         
-        {/* Page numbers */}
-        {pages.map((page, index) => {
-          if (page === '...') {
-            return (
-              <li key={`ellipsis-${index}`}>
-                <span className="relative inline-flex items-center justify-center w-9 h-9 text-sm text-gray-700">
+        {/* Page numbers - only show on medium screens and up */}
+        <div className="hidden md:flex border-l border-r border-gray-200">
+          {pages.map((page, index) => {
+            if (page === '...') {
+              return (
+                <span 
+                  key={`ellipsis-${index}`}
+                  className="flex items-center justify-center w-10 h-10 text-gray-400"
+                >
                   &#8230;
                 </span>
-              </li>
-            );
-          }
-          
-          return (
-            <li key={page}>
+              );
+            }
+            
+            return (
               <button
+                key={page}
                 onClick={() => onPageChange(page)}
-                className={`relative inline-flex items-center justify-center w-9 h-9 text-sm font-medium rounded-full transition-colors ${
+                className={`flex items-center justify-center w-10 h-10 text-sm font-medium transition-colors ${
                   currentPage === page
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1'
+                    ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600'
+                    : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600'
                 }`}
                 aria-current={currentPage === page ? 'page' : undefined}
               >
                 {page}
               </button>
-            </li>
-          );
-        })}
+            );
+          })}
+        </div>
+        
+        {/* Current page indicator for small screens */}
+        <div className="flex md:hidden items-center justify-center px-4 h-10 text-sm font-medium text-gray-700">
+          Page {currentPage} of {totalPages}
+        </div>
         
         {/* Next button */}
-        <li>
-          <button
-            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-            className={`relative inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
-              currentPage === totalPages
-                ? 'text-gray-400 cursor-not-allowed bg-gray-100'
-                : 'text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1'
-            }`}
-            aria-label="Next"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </li>
-      </ul>
+        <button
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages}
+          className={`flex items-center justify-center h-10 px-4 rounded-r-lg transition-colors ${
+            currentPage === totalPages
+              ? 'text-gray-300 cursor-not-allowed'
+              : 'text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-inset'
+          }`}
+          aria-label="Next page"
+        >
+          <span className="sr-only md:not-sr-only md:mr-2 text-sm font-medium">Next</span>
+          <FiChevronRight className="h-5 w-5" />
+        </button>
+      </div>
     </nav>
   );
 };

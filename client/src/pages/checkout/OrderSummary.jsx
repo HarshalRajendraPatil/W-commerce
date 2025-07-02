@@ -6,8 +6,8 @@ const OrderSummary = ({ cart, showCheckoutButton = true }) => {
   const subtotal = cart?.totalPrice || 0;
   const discount = cart?.discountAmount || 0;
   const tax = subtotal * 0.18; // 18% tax
-  const shipping = 0; // Free shipping
-  const total = subtotal + tax - discount;
+  const shipping = 10;
+  const total = subtotal + tax  + shipping;
   
   return (
     <div className="bg-white rounded-lg shadow-md p-6 sticky top-8">
@@ -30,7 +30,7 @@ const OrderSummary = ({ cart, showCheckoutButton = true }) => {
         )}
         
         <div className="flex justify-between">
-          <span className="text-gray-600">Tax (5%)</span>
+          <span className="text-gray-600">Tax (18%)</span>
           <span className="font-medium">${tax.toFixed(2)}</span>
         </div>
         

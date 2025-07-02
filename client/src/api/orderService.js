@@ -6,6 +6,12 @@ export const createOrder = async (orderData) => {
   return response.data;
 };
 
+// Prepare an order without saving to database
+export const prepareOrder = async (orderData) => {
+  const response = await axios.post('/orders/prepare', orderData);
+  return response.data;
+};
+
 // Get all orders for the logged-in user
 export const getMyOrders = async (page = 1, limit = 10) => {
   const response = await axios.get(`/orders/my-orders?page=${page}&limit=${limit}`);
@@ -31,8 +37,8 @@ export const processPayment = async (paymentData) => {
 };
 
 // Create a Razorpay order for payment
-export const createRazorpayOrder = async (orderId) => {
-  const response = await axios.post('/orders/create-razorpay-order', { orderId });
+export const createRazorpayOrder = async (orderData) => {
+  const response = await axios.post('/orders/create-razorpay-order', { orderData });
   return response.data;
 };
 

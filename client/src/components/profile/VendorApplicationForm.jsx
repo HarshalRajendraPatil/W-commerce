@@ -27,7 +27,7 @@ const VendorApplicationForm = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (isError) {
+    if (isError && message !== 'No application found') {
       toast.error(message);
     }
     
