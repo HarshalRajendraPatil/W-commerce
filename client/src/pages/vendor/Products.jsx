@@ -67,6 +67,11 @@ const VendorProducts = () => {
   // Handle pagination change
   const handleChangePage = (newPage) => {
     setPage(newPage);
+    // Scroll to top of the table when page changes
+    window.scrollTo({
+      top: document.getElementById('products-table-container')?.offsetTop - 100 || 0,
+      behavior: 'smooth'
+    });
   };
 
   // Handle rows per page change
@@ -275,21 +280,22 @@ const VendorProducts = () => {
         </div>
         
         {/* Products Table */}
-        <div className="bg-white shadow rounded overflow-hidden">
-          {loading ? (
-            <div className="p-4 flex items-center justify-center">
-              <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="bg-white shadow-md rounded-lg overflow-hidden" id="products-table-container">
+          {/* Loading state */}
+          {loading && (
+            <div className="p-4 flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
             </div>
-          ) : products && products.length > 0 ? (
+          )}
+          
+          {/* Products table */}
+          {!loading && products && products.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Product
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Price
@@ -307,24 +313,27 @@ const VendorProducts = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {products.map((product) => (
-                    <tr key={product._id}>
+                    <tr key={product._id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10">
-                            <img 
-                              className="h-10 w-10 rounded-md object-cover" 
-                              src={product.images && product.images.length > 0 ? product.images[0].url : 'https://via.placeholder.com/50'} 
-                              alt={product.name} 
-                            />
+                            {product.images && product.images.length > 0 ? (
+                              <img 
+                                className="h-10 w-10 rounded-md object-cover" 
+                                src={product.images[0].url} 
+                                alt={product.name} 
+                              />
+                            ) : (
+                              <div className="h-10 w-10 rounded-md bg-gray-200 flex items-center justify-center">
+                                <span className="text-gray-500 text-xs">No img</span>
+                              </div>
+                            )}
                           </div>
                           <div className="ml-4">
                             <div className="text-sm font-medium text-gray-900">{product.name}</div>
                             <div className="text-sm text-gray-500">SKU: {product.sku || 'N/A'}</div>
                           </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{product.category ? product.category.name : 'Uncategorized'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{formatCurrency(product.price)}</div>
@@ -337,17 +346,16 @@ const VendorProducts = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <button 
                           onClick={() => handleStockClick(product)}
-                          className="text-sm font-medium text-gray-900 hover:text-blue-600"
+                          className="text-sm hover:underline focus:outline-none"
+                          title="Click to update stock"
                         >
-                          <span 
-                            className={`inline-flex ${
-                              product.stockCount === 0 
-                                ? 'text-red-600' 
-                                : product.stockCount < 10 
-                                  ? 'text-yellow-600' 
-                                  : 'text-green-600'
-                            }`}
-                          >
+                          <span className={`font-medium ${
+                            product.stockCount === 0 
+                              ? 'text-red-600' 
+                              : product.stockCount < 10 
+                                ? 'text-yellow-600' 
+                                : 'text-green-600'
+                          }`}>
                             {product.stockCount}
                           </span>
                         </button>
@@ -416,24 +424,33 @@ const VendorProducts = () => {
           )}
           
           {/* Pagination */}
-          {pagination && pagination.total > 1 &&  (
-            <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200 sm:px-6">
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    Showing <span className="font-medium">{products.length}</span> of{' '}
-                    <span className="font-medium">{pagination.count}</span> results
-                  </p>
-                </div>
-                <div>
-                  <Pagination
-                    currentPage={page}
-                    totalPages={pagination.total}
-                    onPageChange={handleChangePage}
-                    siblingCount={1}
-                  />
-                </div>
+          {!loading && pagination && (
+            <div className="px-6 py-4 flex flex-col sm:flex-row items-center justify-between border-t border-gray-200">
+              <div className="flex items-center mb-4 sm:mb-0">
+                <span className="text-sm text-gray-700 mr-2">Rows per page:</span>
+                <select
+                  className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={rowsPerPage}
+                  onChange={handleChangeRowsPerPage}
+                >
+                  {[5, 10, 25, 50].map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <span className="ml-4 text-sm text-gray-700">
+                  Showing <span className="font-medium">{products.length}</span> of{' '}
+                  <span className="font-medium">{pagination.count || 0}</span> results
+                </span>
               </div>
+              
+              <Pagination
+                currentPage={pagination.current || page}
+                totalPages={pagination.total || 1}
+                onPageChange={handleChangePage}
+                siblingCount={1}
+              />
             </div>
           )}
         </div>

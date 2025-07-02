@@ -759,32 +759,33 @@ exports.getVendorRecentReviews = async (req, res) => {
 exports.getVendorAnalytics = async (req, res) => {
   try {
     const vendorId = req.user.id;
+    const { timeFrame = '30days', page = 1, limit = 5 } = req.query;
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
     
-    // Get time frame from query (defaults to 30 days)
-    const timeFrame = req.query.timeFrame || '30days';
-    let startDate = new Date();
-    
+    // Determine date range based on timeFrame
+    const startDate = new Date();
     switch (timeFrame) {
       case '7days':
         startDate.setDate(startDate.getDate() - 7);
-        break;
-      case '30days':
-        startDate.setDate(startDate.getDate() - 30);
         break;
       case '90days':
         startDate.setDate(startDate.getDate() - 90);
         break;
       case '1year':
-        startDate.setFullYear(startDate.getFullYear() - 1);
+        startDate.setDate(startDate.getDate() - 365);
         break;
+      case '30days':
       default:
         startDate.setDate(startDate.getDate() - 30);
+        break;
     }
     
-    // Get all products from this vendor
+    // Get vendor's products
     const vendorProducts = await Product.find({ seller: vendorId }, '_id');
     const productIds = vendorProducts.map(product => product._id);
     
+    // If vendor has no products, return empty data
     if (productIds.length === 0) {
       return res.status(200).json({
         success: true,
@@ -806,6 +807,18 @@ exports.getVendorAnalytics = async (req, res) => {
           },
           topProducts: [],
           revenueByCategory: []
+        },
+        pagination: {
+          products: {
+            current: pageNum,
+            total: 1,
+            count: 0
+          },
+          categories: {
+            current: pageNum,
+            total: 1,
+            count: 0
+          }
         }
       });
     }
@@ -832,6 +845,7 @@ exports.getVendorAnalytics = async (req, res) => {
       
       if (!salesByDay[date]) {
         salesByDay[date] = {
+          date,
           revenue: 0,
           orders: 0
         };
@@ -850,6 +864,7 @@ exports.getVendorAnalytics = async (req, res) => {
           const productId = item.product.toString();
           if (!productSales[productId]) {
             productSales[productId] = {
+              id: productId,
               revenue: 0,
               quantity: 0,
               name: item.name,
@@ -868,6 +883,7 @@ exports.getVendorAnalytics = async (req, res) => {
             
             if (!categorySales[categoryId]) {
               categorySales[categoryId] = {
+                id: categoryId,
                 revenue: 0,
                 orders: 0,
                 name: categoryName
@@ -954,29 +970,45 @@ exports.getVendorAnalytics = async (req, res) => {
     const revenueGrowth = await calculateGrowth(startDate, 'revenue');
     const orderGrowth = await calculateGrowth(startDate, 'orders');
     
-    // Format sales data for charts
-    const salesData = Object.keys(salesByDay).map(date => ({
-      date,
-      revenue: salesByDay[date].revenue,
-      orders: salesByDay[date].orders
-    }));
+    // Format sales data for charts - ensure we have data for every day in the range
+    const salesData = [];
+    const currentDate = new Date(startDate);
+    const endDate = new Date();
     
-    // Get top selling products
-    const topProducts = Object.keys(productSales)
-      .map(id => ({
-        id,
-        ...productSales[id]
-      }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5);
+    while (currentDate <= endDate) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      salesData.push({
+        date: dateStr,
+        revenue: (salesByDay[dateStr]?.revenue || 0),
+        orders: (salesByDay[dateStr]?.orders || 0)
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
     
-    // Format category sales data
-    const revenueByCategory = Object.keys(categorySales)
-      .map(id => ({
-        id,
-        ...categorySales[id]
-      }))
-      .sort((a, b) => b.revenue - a.revenue);
+    // Get top selling products with pagination
+    const sortedProductIds = Object.keys(productSales)
+      .sort((a, b) => productSales[b].revenue - productSales[a].revenue);
+    
+    const totalProductCount = sortedProductIds.length;
+    const totalProductPages = Math.ceil(totalProductCount / limitNum);
+    const startIdx = (pageNum - 1) * limitNum;
+    const endIdx = Math.min(startIdx + limitNum, totalProductCount);
+    
+    const paginatedProductIds = sortedProductIds.slice(startIdx, endIdx);
+    const topProducts = paginatedProductIds.map(id => productSales[id]);
+    
+    // Format category sales data with pagination
+    const sortedCategoryIds = Object.keys(categorySales)
+      .sort((a, b) => categorySales[b].revenue - categorySales[a].revenue);
+    
+    const totalCategoryCount = sortedCategoryIds.length;
+    const totalCategoryPages = Math.ceil(totalCategoryCount / limitNum);
+    const categoryStartIdx = (pageNum - 1) * limitNum;
+    const categoryEndIdx = Math.min(categoryStartIdx + limitNum, totalCategoryCount);
+    
+    const paginatedCategoryIds = sortedCategoryIds.slice(categoryStartIdx, categoryEndIdx);
+    const revenueByCategory = paginatedCategoryIds.map(id => categorySales[id]);
     
     // Get product stats
     const productStats = {
@@ -994,20 +1026,32 @@ exports.getVendorAnalytics = async (req, res) => {
           growth: revenueGrowth
         },
         orders: {
-          data: salesData,
+          data: salesData, // Reuse the same data structure for orders
           total: totalOrders,
           growth: orderGrowth
         },
         products: productStats,
-        topProducts,
-        revenueByCategory
+        topProducts: topProducts,
+        revenueByCategory: revenueByCategory
+      },
+      pagination: {
+        products: {
+          current: pageNum,
+          total: Math.max(1, totalProductPages),
+          count: totalProductCount
+        },
+        categories: {
+          current: pageNum,
+          total: Math.max(1, totalCategoryPages),
+          count: totalCategoryCount
+        }
       }
     });
   } catch (error) {
     console.error('Error fetching vendor analytics:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error'
+      message: 'Failed to fetch analytics data'
     });
   }
 };

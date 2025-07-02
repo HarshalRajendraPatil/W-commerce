@@ -127,9 +127,9 @@ const vendorOrdersSlice = createSlice({
         
         // Update order in the list if it exists
         if (action.payload && action.payload.data && state.orders.length > 0) {
-          const index = state.orders.findIndex(order => order._id === action.payload.data._id);
-          if (index !== -1) {
-            state.orders[index] = action.payload.data;
+        const index = state.orders.findIndex(order => order._id === action.payload.data._id);
+        if (index !== -1) {
+          state.orders[index] = action.payload.data;
           }
         }
       })

@@ -298,8 +298,8 @@ const VendorOrders = () => {
             <div className="mt-4">
               <div className="flex justify-between items-center">
                 <div className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{orders.length}</span> of{' '}
-                  <span className="font-medium">{pagination.count}</span> results
+                    Showing <span className="font-medium">{orders.length}</span> of{' '}
+                    <span className="font-medium">{pagination.count}</span> results
                 </div>
               </div>
               <Pagination 

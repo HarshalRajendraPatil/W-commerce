@@ -42,10 +42,6 @@ const Profile = () => {
   // Show error message if API request fails
   useEffect(() => {
     if (isError) {
-      // If the error is "No application found" for a customer, don't show as an error
-      if (message !== 'No application found') {
-        toast.error(message);
-      }
       dispatch(reset());
     }
   }, [isError, message, dispatch]);

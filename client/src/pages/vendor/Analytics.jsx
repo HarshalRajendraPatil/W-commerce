@@ -55,6 +55,7 @@ const VendorAnalytics = () => {
   };
   
   const formatCurrency = (value) => {
+    if (value === undefined || value === null) return '$0.00';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -63,10 +64,10 @@ const VendorAnalytics = () => {
   };
   
   // Format data for charts
-  const salesChartData = data?.sales?.data || [];
+  const salesChartData = Array.isArray(data?.sales?.data) ? data.sales.data : [];
   
   // Format data for category chart
-  const categoryChartData = data?.revenueByCategory || [];
+  const categoryChartData = Array.isArray(data?.revenueByCategory) ? data.revenueByCategory : [];
   
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
@@ -136,9 +137,9 @@ const VendorAnalytics = () => {
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-medium text-gray-500">Total Revenue</h2>
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  data?.sales?.growth >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  (data?.sales?.growth || 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 }`}>
-                  {data?.sales?.growth >= 0 ? '↑' : '↓'} {Math.abs(data?.sales?.growth || 0).toFixed(1)}%
+                  {(data?.sales?.growth || 0) >= 0 ? '↑' : '↓'} {Math.abs(data?.sales?.growth || 0).toFixed(1)}%
                 </span>
               </div>
               <div className="mt-2">
@@ -158,9 +159,9 @@ const VendorAnalytics = () => {
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-medium text-gray-500">Total Orders</h2>
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  data?.orders?.growth >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  (data?.orders?.growth || 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 }`}>
-                  {data?.orders?.growth >= 0 ? '↑' : '↓'} {Math.abs(data?.orders?.growth || 0).toFixed(1)}%
+                  {(data?.orders?.growth || 0) >= 0 ? '↑' : '↓'} {Math.abs(data?.orders?.growth || 0).toFixed(1)}%
                 </span>
               </div>
               <div className="mt-2">
@@ -211,7 +212,7 @@ const VendorAnalytics = () => {
             <h2 className="text-lg font-medium text-gray-800 mb-4">Sales Performance</h2>
             <div className="bg-white p-4 rounded-lg border border-gray-200">
               <div className="h-80">
-                {salesChartData.length > 0 ? (
+                {salesChartData && salesChartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
                       data={salesChartData}
@@ -219,12 +220,24 @@ const VendorAnalytics = () => {
                     >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="date" />
-                      <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                      <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                      <Tooltip formatter={(value, name) => {
-                        if (name === 'revenue') return formatCurrency(value);
-                        return value;
-                      }} />
+                      <YAxis 
+                        yAxisId="left" 
+                        orientation="left" 
+                        stroke="#8884d8" 
+                        tickFormatter={(value) => formatCurrency(value)}
+                      />
+                      <YAxis 
+                        yAxisId="right" 
+                        orientation="right" 
+                        stroke="#82ca9d" 
+                      />
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          if (name === 'revenue') return formatCurrency(value);
+                          return value;
+                        }}
+                        labelFormatter={(label) => `Date: ${label}`}
+                      />
                       <Legend />
                       <Line
                         yAxisId="left"
@@ -233,6 +246,7 @@ const VendorAnalytics = () => {
                         name="Revenue"
                         stroke="#8884d8"
                         activeDot={{ r: 8 }}
+                        isAnimationActive={false}
                       />
                       <Line
                         yAxisId="right"
@@ -240,6 +254,7 @@ const VendorAnalytics = () => {
                         dataKey="orders"
                         name="Orders"
                         stroke="#82ca9d"
+                        isAnimationActive={false}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -258,51 +273,51 @@ const VendorAnalytics = () => {
             <div>
               <h2 className="text-lg font-medium text-gray-800 mb-4">Top Products</h2>
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                {data?.topProducts?.length > 0 ? (
+                {data?.topProducts && data.topProducts.length > 0 ? (
                   <>
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Product
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Revenue
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Quantity
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {data.topProducts.map((product, index) => (
-                          <tr key={product.id || index}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="flex-shrink-0 h-10 w-10">
-                                  <img
-                                    className="h-10 w-10 rounded-full object-cover"
-                                    src={product.image || 'https://via.placeholder.com/40'}
-                                    alt={product.name}
-                                  />
-                                </div>
-                                <div className="ml-4">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {product.name}
-                                  </div>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Product
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Revenue
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {data.topProducts.map((product, index) => (
+                        <tr key={product.id || index}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-10 w-10">
+                                <img
+                                  className="h-10 w-10 rounded-full object-cover"
+                                  src={product.image || 'https://via.placeholder.com/40'}
+                                  alt={product.name}
+                                />
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {product.name}
                                 </div>
                               </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatCurrency(product.revenue)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {product.quantity}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatCurrency(product.revenue)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {product.quantity}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                     
                     {/* Pagination for Products */}
                     {pagination?.products?.total > 1 && (
@@ -310,12 +325,12 @@ const VendorAnalytics = () => {
                         <div className="flex justify-between items-center mb-2">
                           <p className="text-sm text-gray-700">
                             Showing <span className="font-medium">{data.topProducts.length}</span> of{' '}
-                            <span className="font-medium">{pagination.products.count}</span> products
+                            <span className="font-medium">{pagination.products.count || 0}</span> products
                           </p>
                         </div>
                         <Pagination
-                          currentPage={pagination.products.current}
-                          totalPages={pagination.products.total}
+                          currentPage={pagination.products.current || 1}
+                          totalPages={pagination.products.total || 1}
                           onPageChange={handleProductsPageChange}
                         />
                       </div>
@@ -334,7 +349,7 @@ const VendorAnalytics = () => {
               <h2 className="text-lg font-medium text-gray-800 mb-4">Revenue by Category</h2>
               <div className="bg-white p-4 rounded-lg border border-gray-200">
                 <div className="h-80">
-                  {categoryChartData.length > 0 ? (
+                  {categoryChartData && categoryChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={categoryChartData}
@@ -342,10 +357,18 @@ const VendorAnalytics = () => {
                       >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => formatCurrency(value)} />
+                        <YAxis tickFormatter={(value) => formatCurrency(value)} />
+                        <Tooltip 
+                          formatter={(value) => formatCurrency(value)} 
+                          labelFormatter={(label) => `Category: ${label}`}
+                        />
                         <Legend />
-                        <Bar dataKey="revenue" name="Revenue" fill="#8884d8" />
+                        <Bar 
+                          dataKey="revenue" 
+                          name="Revenue" 
+                          fill="#8884d8" 
+                          isAnimationActive={false}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -361,12 +384,12 @@ const VendorAnalytics = () => {
                     <div className="flex justify-between items-center mb-2">
                       <p className="text-sm text-gray-700">
                         Showing <span className="font-medium">{categoryChartData.length}</span> of{' '}
-                        <span className="font-medium">{pagination.categories.count}</span> categories
+                        <span className="font-medium">{pagination.categories.count || 0}</span> categories
                       </p>
                     </div>
                     <Pagination
-                      currentPage={pagination.categories.current}
-                      totalPages={pagination.categories.total}
+                      currentPage={pagination.categories.current || 1}
+                      totalPages={pagination.categories.total || 1}
                       onPageChange={handleCategoriesPageChange}
                     />
                   </div>

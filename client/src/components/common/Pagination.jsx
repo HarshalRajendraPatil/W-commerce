@@ -59,17 +59,17 @@ const Pagination = ({
   const pages = generatePagination();
 
   return (
-    <nav className="flex justify-center mt-8" aria-label="Pagination">
-      <ul className="inline-flex items-center -space-x-px rounded-md shadow-sm">
+    <nav className="flex justify-center" aria-label="Pagination">
+      <ul className="inline-flex items-center space-x-1">
         {/* Previous button */}
         <li>
           <button
             onClick={() => onPageChange(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
-            className={`relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-l-md ${
+            className={`relative inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
               currentPage === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-white text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 border border-gray-300'
+                ? 'text-gray-400 cursor-not-allowed bg-gray-100'
+                : 'text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1'
             }`}
             aria-label="Previous"
           >
@@ -84,7 +84,7 @@ const Pagination = ({
           if (page === '...') {
             return (
               <li key={`ellipsis-${index}`}>
-                <span className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300">
+                <span className="relative inline-flex items-center justify-center w-9 h-9 text-sm text-gray-700">
                   &#8230;
                 </span>
               </li>
@@ -95,11 +95,12 @@ const Pagination = ({
             <li key={page}>
               <button
                 onClick={() => onPageChange(page)}
-                className={`relative inline-flex items-center px-4 py-2 text-sm font-medium border ${
+                className={`relative inline-flex items-center justify-center w-9 h-9 text-sm font-medium rounded-full transition-colors ${
                   currentPage === page
-                    ? 'z-10 bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 border-gray-300'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1'
                 }`}
+                aria-current={currentPage === page ? 'page' : undefined}
               >
                 {page}
               </button>
@@ -112,10 +113,10 @@ const Pagination = ({
           <button
             onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
-            className={`relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-r-md ${
+            className={`relative inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
               currentPage === totalPages
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-white text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 border border-gray-300'
+                ? 'text-gray-400 cursor-not-allowed bg-gray-100'
+                : 'text-gray-700 hover:bg-indigo-100 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1'
             }`}
             aria-label="Next"
           >

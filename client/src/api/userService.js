@@ -119,6 +119,17 @@ const getVendorSales = async (period = 'month') => {
   return response.data;
 };
 
+// Get vendor analytics
+const getVendorAnalytics = async (timeFrame = '30days', page = 1, limit = 5) => {
+  const queryParams = new URLSearchParams();
+  queryParams.append('timeFrame', timeFrame);
+  queryParams.append('page', page);
+  queryParams.append('limit', limit);
+  
+  const response = await axios.get(`/dashboard/vendor/analytics?${queryParams.toString()}`);
+  return response.data;
+};
+
 // Admin-specific services
 // Get system stats
 const getSystemStats = async () => {
@@ -153,6 +164,7 @@ const userService = {
   getMyReviews,
   getVendorProducts,
   getVendorSales,
+  getVendorAnalytics,
   getSystemStats,
   getUserStats,
   getUsers,

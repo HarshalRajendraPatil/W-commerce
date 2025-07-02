@@ -9,6 +9,7 @@ import Loader from '../../components/common/Loader';
 import userService from '../../api/userService';
 import { formatCurrency } from '../../utils/formatters';
 import { Link } from 'react-router-dom';
+import VendorAnalytics from '../vendor/Analytics';
 
 const VendorProfile = () => {
   const dispatch = useDispatch();
@@ -328,7 +329,7 @@ const VendorProfile = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <a
-                              href={`/dashboard/products/${product._id}/edit`}
+                              href={`/vendor/products/edit/${product._id}`}
                               className="text-indigo-600 hover:text-indigo-900 mr-3"
                             >
                               Edit
@@ -429,9 +430,6 @@ const VendorProfile = () => {
                     Status
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Sales
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -477,9 +475,6 @@ const VendorProfile = () => {
                         {product.published ? 'Published' : 'Draft'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {product.totalSales || 0} sold
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-3">
                         <button
@@ -489,7 +484,7 @@ const VendorProfile = () => {
                           {product.published ? 'Unpublish' : 'Publish'}
                         </button>
                         <Link
-                          to={`/vendor/products/${product._id}/edit`}
+                          to={`/vendor/products/edit/${product._id}`}
                           className="text-indigo-600 hover:text-indigo-900"
                         >
                           Edit
@@ -575,137 +570,7 @@ const VendorProfile = () => {
       )}
       
       {activeTab === 'sales' && (
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Sales Analytics</h2>
-            <div className="inline-flex rounded-md shadow-sm">
-              <button
-                onClick={() => setSalesPeriod('week')}
-                className={`px-4 py-2 text-sm font-medium rounded-l-md border ${
-                  salesPeriod === 'week'
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Week
-              </button>
-              <button
-                onClick={() => setSalesPeriod('month')}
-                className={`px-4 py-2 text-sm font-medium border-t border-b ${
-                  salesPeriod === 'month'
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Month
-              </button>
-              <button
-                onClick={() => setSalesPeriod('year')}
-                className={`px-4 py-2 text-sm font-medium rounded-r-md border ${
-                  salesPeriod === 'year'
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Year
-              </button>
-            </div>
-          </div>
-          
-          {salesData ? (
-            <div>
-              {/* Sales chart would go here */}
-              <div className="h-80 bg-gray-50 rounded-md mb-6 flex items-center justify-center">
-                <FiBarChart2 className="h-12 w-12 text-gray-400" />
-                <span className="ml-2 text-gray-500">Sales chart visualization</span>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <StatsCard
-                  title="Period Revenue"
-                  value={formatCurrency(salesData.totalRevenue)}
-                  icon={<FiDollarSign className="h-6 w-6" />}
-                  color="green"
-                  footer={`From ${new Date(salesData.startDate).toLocaleDateString()} to ${new Date(salesData.endDate).toLocaleDateString()}`}
-                />
-                <StatsCard
-                  title="Orders in Period"
-                  value={salesData.orderCount}
-                  icon={<FiShoppingBag className="h-6 w-6" />}
-                  color="blue"
-                  footer={salesPeriod === 'week' ? 'This week' : salesPeriod === 'month' ? 'This month' : 'This year'}
-                />
-                <StatsCard
-                  title={salesPeriod === 'month' ? 'Monthly Growth' : salesPeriod === 'week' ? 'Weekly Growth' : 'Yearly Growth'}
-                  value={`${salesData.growthRate}%`}
-                  icon={<FiTrendingUp className="h-6 w-6" />}
-                  color={salesData.growthRate >= 0 ? 'green' : 'red'}
-                  footer={`Compared to previous ${salesPeriod}`}
-                />
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 mb-3">Top Selling Products</h3>
-                
-                {salesData.topProducts && salesData.topProducts.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Product
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Units Sold
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Revenue
-                          </th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            % of Total
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {salesData.topProducts.map((product) => (
-                          <tr key={product._id}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="h-10 w-10 flex-shrink-0">
-                                  <img
-                                    className="h-10 w-10 rounded-full object-cover"
-                                    src={product.image || '/placeholder.png'}
-                                    alt={product.name}
-                                  />
-                                </div>
-                                <div className="ml-4">
-                                  <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {product.unitsSold}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {formatCurrency(product.revenue)}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {product.percentage}%
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No sales data available for this period.</p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <Loader />
-          )}
-        </div>
+        <VendorAnalytics />
       )}
       
       {activeTab === 'addresses' && (
