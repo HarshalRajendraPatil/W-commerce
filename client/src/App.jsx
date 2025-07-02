@@ -58,6 +58,7 @@ import VendorReviews from './pages/vendor/Reviews';
 import VendorAnalytics from './pages/vendor/Analytics';
 import AddProduct from './pages/vendor/AddProduct';
 import EditProduct from './pages/vendor/EditProduct';
+import ProductStats from './pages/vendor/ProductStats';
 
 // Protected route component
 const ProtectedRoute = ({ children }) => {
@@ -250,12 +251,12 @@ function App() {
             <Route path="dashboard" element={<VendorDashboard />} />
             <Route path="products" element={<VendorProducts />} />
             <Route path="products/new" element={<AddProduct />} />
-            <Route path="products/edit/:id" element={<EditProduct />} />
+            <Route path="products/edit/:productId" element={<EditProduct />} />
+            <Route path="products/stats/:productId" element={<ProductStats />} />
             <Route path="orders" element={<VendorOrders />} />
-            <Route path="orders/:id" element={<VendorOrderDetails />} />
+            <Route path="orders/:orderId" element={<VendorOrderDetails />} />
             <Route path="reviews" element={<VendorReviews />} />
             <Route path="analytics" element={<VendorAnalytics />} />
-            <Route path="settings" element={<div>Settings (to be implemented)</div>} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

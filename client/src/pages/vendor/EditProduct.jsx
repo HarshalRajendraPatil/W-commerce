@@ -10,7 +10,8 @@ import Loader from '../../components/common/Loader';
 const EditProduct = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { productId } = useParams();
+
   
   // Form state
   const [formData, setFormData] = useState({
@@ -52,7 +53,7 @@ const EditProduct = () => {
         setLoading(true);
         
         // Fetch product data
-        const productResponse = await vendorApi.getProductById(id);
+        const productResponse = await vendorApi.getProductById(productId);
         const product = productResponse.data.data;
         
         // Fetch categories
@@ -100,7 +101,7 @@ const EditProduct = () => {
     };
     
     fetchData();
-  }, [id]);
+  }, [productId]);
   
   // Handle input changes
   const handleChange = (e) => {
@@ -244,7 +245,7 @@ const EditProduct = () => {
       productData.append('primaryImageIndex', primaryImageIndex.toString());
       
       // Dispatch action to update product
-      const resultAction = await dispatch(updateProduct({ id, productData }));
+      const resultAction = await dispatch(updateProduct({id: productId, productData }));
       
       if (updateProduct.fulfilled.match(resultAction)) {
         toast.success('Product updated successfully!');

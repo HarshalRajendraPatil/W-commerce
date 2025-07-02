@@ -12,6 +12,7 @@ import vendorProductsReducer from './slices/vendorProductsSlice';
 import vendorOrdersReducer from './slices/vendorOrdersSlice';
 import vendorReviewsReducer from './slices/vendorReviewsSlice';
 import vendorAnalyticsReducer from './slices/vendorAnalyticsSlice';
+import productStatsReducer from './slices/productStatsSlice';
 import userReducer from './slices/userSlice';
 import couponReducer from './slices/couponSlice';
 
@@ -31,6 +32,7 @@ const store = configureStore({
     vendorOrders: vendorOrdersReducer,
     vendorReviews: vendorReviewsReducer,
     vendorAnalytics: vendorAnalyticsReducer,
+    productStats: productStatsReducer,
     user: userReducer,
     coupon: couponReducer
   },

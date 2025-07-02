@@ -1065,4 +1065,152 @@ exports.toggleFeaturedStatus = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+/**
+ * @desc    Get detailed statistics for a specific product
+ * @route   GET /api/products/:id/stats
+ * @access  Private (Vendor)
+ */
+exports.getProductStats = async (req, res, next) => {
+  try {
+    const productId = req.params.id;
+    
+    // Check if product exists and belongs to the vendor
+    const product = await Product.findOne({
+      _id: productId,
+      seller: req.user.id
+    }).populate('category', 'name');
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found or you do not have permission to view it'
+      });
+    }
+    
+    // Get review statistics
+    const reviewStats = await Review.aggregate([
+      { $match: { product: new mongoose.Types.ObjectId(productId) } },
+      { 
+        $group: {
+          _id: null,
+          totalReviews: { $sum: 1 },
+          averageRating: { $avg: '$rating' },
+          rating5: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
+          rating4: { $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] } },
+          rating3: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
+          rating2: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
+          rating1: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } }
+        }
+      }
+    ]);
+    
+    // Get recent reviews
+    const recentReviews = await Review.find({ product: productId })
+      .sort('-createdAt')
+      .limit(5)
+      .populate('user', 'name avatar');
+    
+    // Get order statistics for this product
+    const Order = mongoose.model('Order');
+    const orderStats = await Order.aggregate([
+      { $unwind: '$items' },
+      { $match: { 'items.product': new mongoose.Types.ObjectId(productId) } },
+      { 
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          totalQuantitySold: { $sum: '$items.quantity' },
+          totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } }
+        }
+      }
+    ]);
+    
+    // Get monthly sales data for the past 6 months
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    const monthlySales = await Order.aggregate([
+      { $unwind: '$items' },
+      { 
+        $match: { 
+          'items.product': new mongoose.Types.ObjectId(productId),
+          'createdAt': { $gte: sixMonthsAgo },
+          'status': { $nin: ['cancelled', 'refunded'] }
+        }
+      },
+      {
+        $group: {
+          _id: { 
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          totalSales: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+          totalQuantity: { $sum: '$items.quantity' }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+    
+    // Format monthly sales data
+    const formattedMonthlySales = monthlySales.map(item => ({
+      month: `${item._id.year}-${item._id.month.toString().padStart(2, '0')}`,
+      sales: item.totalSales,
+      quantity: item.totalQuantity
+    }));
+    
+    // Get inventory history
+    // This would require a separate collection to track inventory changes
+    // For now, we'll just return the current stock level
+    
+    // Compile all stats
+    const productStats = {
+      basicInfo: {
+        id: product._id,
+        name: product.name,
+        price: product.price,
+        salePrice: product.salePrice,
+        stockCount: product.stockCount,
+        category: product.category,
+        published: product.published,
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
+        images: product.images
+      },
+      reviewStats: reviewStats.length > 0 ? {
+        totalReviews: reviewStats[0].totalReviews,
+        averageRating: reviewStats[0].averageRating,
+        ratingDistribution: {
+          5: reviewStats[0].rating5,
+          4: reviewStats[0].rating4,
+          3: reviewStats[0].rating3,
+          2: reviewStats[0].rating2,
+          1: reviewStats[0].rating1
+        }
+      } : {
+        totalReviews: 0,
+        averageRating: 0,
+        ratingDistribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 }
+      },
+      recentReviews,
+      orderStats: orderStats.length > 0 ? {
+        totalOrders: orderStats[0].totalOrders,
+        totalQuantitySold: orderStats[0].totalQuantitySold,
+        totalRevenue: orderStats[0].totalRevenue
+      } : {
+        totalOrders: 0,
+        totalQuantitySold: 0,
+        totalRevenue: 0
+      },
+      monthlySales: formattedMonthlySales
+    };
+    
+    res.status(200).json({
+      success: true,
+      data: productStats
+    });
+  } catch (err) {
+    next(err);
+  }
 }; 

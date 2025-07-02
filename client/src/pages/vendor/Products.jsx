@@ -13,7 +13,8 @@ import {
   FiEdit,
   FiSearch,
   FiEye,
-  FiEyeOff
+  FiEyeOff,
+  FiBarChart2
 } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import Pagination from '../../components/common/Pagination';
@@ -371,20 +372,36 @@ const VendorProducts = () => {
                           >
                             {product.published ? <FiEyeOff /> : <FiEye />}
                           </button>
-                          <Link
-                            to={`/vendor/products/edit/${product._id}`}
-                            className="text-gray-600 hover:text-yellow-600"
-                            title="Edit"
-                          >
-                            <FiEdit />
-                          </Link>
-                          <button
-                            onClick={() => handleDeleteClick(product)}
-                            className="text-gray-600 hover:text-red-600"
-                            title="Delete"
-                          >
-                            <FiTrash2 />
-                          </button>
+                          <div className="flex space-x-1">
+                            <Link
+                              to={`/products/${product._id}`}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-full"
+                              title="View Product"
+                            >
+                              <FiEye size={18} />
+                            </Link>
+                            <Link
+                              to={`/vendor/products/stats/${product._id}`}
+                              className="p-2 text-purple-600 hover:bg-purple-50 rounded-full"
+                              title="Product Statistics"
+                            >
+                              <FiBarChart2 size={18} />
+                            </Link>
+                            <Link
+                              to={`/vendor/products/edit/${product._id}`}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-full"
+                              title="Edit Product"
+                            >
+                              <FiEdit size={18} />
+                            </Link>
+                            <button
+                              onClick={() => handleDeleteClick(product)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-full"
+                              title="Delete Product"
+                            >
+                              <FiTrash2 size={18} />
+                            </button>
+                          </div>
                         </div>
                       </td>
                     </tr>

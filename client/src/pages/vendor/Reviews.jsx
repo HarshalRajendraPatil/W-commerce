@@ -23,7 +23,7 @@ const VendorReviews = () => {
   const [approvalFilter, setApprovalFilter] = useState('');
   const [showResponseModal, setShowResponseModal] = useState(false);
   const [reviewToRespond, setReviewToRespond] = useState(null);
-  const [response, setResponse] = useState('');
+  const [responseText, setResponseText] = useState('');
   
   useEffect(() => {
     loadReviews();
@@ -33,7 +33,7 @@ const VendorReviews = () => {
     if (success) {
       setShowResponseModal(false);
       setReviewToRespond(null);
-      setResponse('');
+      setResponseText('');
     }
   }, [success]);
   
@@ -59,20 +59,26 @@ const VendorReviews = () => {
   };
   
   const openResponseModal = (review) => {
+    console.log('Opening response modal for review:', review);
     setReviewToRespond(review);
-    setResponse(review.vendorResponse?.text || '');
+    setResponseText(review.vendorResponse?.text || '');
     setShowResponseModal(true);
+    console.log('Modal state set to:', true);
+  };
+  
+  const closeResponseModal = () => {
+    setShowResponseModal(false);
   };
   
   const handleResponseSubmit = () => {
-    if (!response.trim()) {
+    if (!responseText.trim()) {
       alert('Please enter a response');
       return;
     }
     
     dispatch(respondToReview({
       reviewId: reviewToRespond._id,
-      response
+      response: responseText
     }));
   };
   
@@ -102,6 +108,26 @@ const VendorReviews = () => {
     <div className="bg-white p-6 rounded-lg shadow-md">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <h1 className="text-2xl font-semibold text-gray-800">Product Reviews</h1>
+        <button 
+          onClick={() => {
+            console.log('Debug button clicked');
+            const dummyReview = {
+              _id: 'debug-review',
+              rating: 4,
+              text: 'This is a test review',
+              user: { name: 'Test User', avatar: 'https://via.placeholder.com/40' },
+              product: { name: 'Test Product' },
+              createdAt: new Date().toISOString(),
+              vendorResponse: null
+            };
+            setReviewToRespond(dummyReview);
+            setResponseText('');
+            setShowResponseModal(true);
+          }}
+          className="md:inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
+          Debug Modal
+        </button>
       </div>
       
       {/* Statistics */}
@@ -294,7 +320,7 @@ const VendorReviews = () => {
                       {review.product?.name || 'Product'}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-700">{review.text}</p>
+                  <p className="text-sm text-gray-700">{review.text || review.comment}</p>
                 </div>
                 
                 {review.vendorResponse ? (
@@ -344,52 +370,48 @@ const VendorReviews = () => {
       
       {/* Response Modal */}
       {showResponseModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={() => setShowResponseModal(false)}></div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
-                      {reviewToRespond?.vendorResponse ? 'Edit Response' : 'Respond to Review'}
-                    </h3>
-                    <div className="mt-4">
-                      <label htmlFor="response-text" className="block text-sm font-medium text-gray-700">
-                        Your Response
-                      </label>
-                      <div className="mt-1">
-                        <textarea
-                          id="response-text"
-                          name="response"
-                          rows={4}
-                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border border-gray-300 rounded-md p-2"
-                          placeholder="Write your response here..."
-                          value={response}
-                          onChange={(e) => setResponse(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={handleResponseSubmit}
-                >
-                  Submit
-                </button>
-                <button
-                  type="button"
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  onClick={() => setShowResponseModal(false)}
-                >
-                  Cancel
-                </button>
-              </div>
+        <div 
+          className="fixed inset-0 bg-transparent backdrop-blur-sm bg-opacity-50 flex items-center justify-center z-50"
+          onClick={closeResponseModal}
+        >
+          <div 
+            className="bg-white rounded-lg p-6 w-full max-w-md mx-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              {reviewToRespond?.vendorResponse ? 'Edit Response' : 'Respond to Review'}
+            </h3>
+            
+            <div className="mb-4">
+              <label htmlFor="response-text" className="block text-sm font-medium text-gray-700 mb-1">
+                Your Response
+              </label>
+              <textarea
+                id="response-text"
+                name="response"
+                rows={4}
+                className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border border-gray-300 rounded-md p-2"
+                placeholder="Write your response here..."
+                value={responseText}
+                onChange={e => setResponseText(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                onClick={closeResponseModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                onClick={handleResponseSubmit}
+              >
+                Submit
+              </button>
             </div>
           </div>
         </div>

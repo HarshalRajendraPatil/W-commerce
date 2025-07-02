@@ -60,7 +60,21 @@ const ReviewSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
       }
-    ]
+    ],
+    vendorResponse: {
+      text: {
+        type: String,
+        trim: true,
+        maxlength: [1000, 'Response cannot be more than 1000 characters']
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now
+      },
+      updatedAt: {
+        type: Date
+      }
+    }
   },
   {
     timestamps: true

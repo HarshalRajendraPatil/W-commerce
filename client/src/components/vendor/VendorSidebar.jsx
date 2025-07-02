@@ -21,7 +21,7 @@ const VendorSidebar = () => {
       )
     },
     {
-      title: 'Products',
+      title: 'Product Management',
       path: '/vendor/products',
       icon: (
         <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -30,6 +30,26 @@ const VendorSidebar = () => {
           <path d="M4 17L12 21L20 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       ),
+      subItems: [
+        {
+          title: 'All Products',
+          path: '/vendor/products',
+          icon: (
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )
+        },
+        {
+          title: 'Add New Product',
+          path: '/vendor/products/new',
+          icon: (
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 4v16m8-8H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )
+        }
+      ]
     },
     {
       title: 'Orders',

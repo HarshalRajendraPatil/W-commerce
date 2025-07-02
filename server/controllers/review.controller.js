@@ -122,6 +122,9 @@ exports.getReviews = async (req, res, next) => {
     if (req.query.fields) {
       const fields = req.query.fields.split(',').join(' ');
       query = query.select(fields);
+    } else {
+      // Always include vendorResponse in the response
+      query = query.select('+vendorResponse');
     }
 
     // Execute query
@@ -812,7 +815,8 @@ exports.getVendorProductReviews = async (req, res) => {
       })
       .sort(req.query.sort || '-createdAt')
       .skip(startIndex)
-      .limit(limit);
+      .limit(limit)
+      .select('+vendorResponse'); // Include vendorResponse in the result
     
     // Get total count
     const total = await Review.countDocuments(filter);
@@ -925,17 +929,35 @@ exports.respondToReview = async (req, res) => {
       });
     }
     
-    // Add vendor response
-    review.vendorResponse = {
-      text: response,
-      createdAt: Date.now()
-    };
+    // Add or update vendor response
+    if (review.vendorResponse) {
+      // Update existing response
+      review.vendorResponse.text = response;
+      review.vendorResponse.updatedAt = Date.now();
+    } else {
+      // Add new response
+      review.vendorResponse = {
+        text: response,
+        createdAt: Date.now()
+      };
+    }
     
     await review.save();
     
+    // Populate user and product details before sending response
+    const updatedReview = await Review.findById(review._id)
+      .populate({
+        path: 'user',
+        select: 'name avatar'
+      })
+      .populate({
+        path: 'product',
+        select: 'name images'
+      });
+    
     res.status(200).json({
       success: true,
-      data: review
+      data: updatedReview
     });
   } catch (err) {
     res.status(500).json({
@@ -965,7 +987,8 @@ exports.getUserReviews = async (req, res, next) => {
         path: 'product',
         select: 'name images price'
       })
-      .sort('-createdAt');
+      .sort('-createdAt')
+      .select('+vendorResponse'); // Include vendorResponse in the result
     
     const reviews = await query;
     

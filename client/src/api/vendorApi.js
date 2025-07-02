@@ -20,6 +20,10 @@ export const vendorApi = {
     return axios.get(`/products/${id}`);
   },
   
+  getProductStats: (id) => {
+    return axios.get(`/products/${id}/stats`);
+  },
+  
   createProduct: (productData) => {
     return axios.post('/products', productData, {
       headers: {

@@ -15,7 +15,8 @@ const {
   getVendorProducts,
   updateProductStock,
   updateProductStatus,
-  toggleFeaturedStatus
+  toggleFeaturedStatus,
+  getProductStats
 } = require('../controllers/product.controller');
 
 const router = express.Router();
@@ -32,6 +33,7 @@ router.get('/:id/related', getRelatedProducts);
 
 // Vendor specific routes
 router.get('/vendor/products', protect, authorize('vendor', 'admin'), getVendorProducts);
+router.get('/:id/stats', protect, authorize('vendor', 'admin'), getProductStats);
 router.patch('/:id/stock', protect, authorize('vendor', 'admin'), updateProductStock);
 router.patch('/:id/status', protect, authorize('vendor', 'admin'), updateProductStatus);
 

@@ -169,6 +169,19 @@ const ReviewList = ({ productId }) => {
                   </div>
                 )}
 
+                {/* Vendor Response */}
+                {review.vendorResponse && review.vendorResponse.text && (
+                  <div className="mt-4 bg-indigo-50 p-4 rounded-md border-l-4 border-indigo-400">
+                    <h4 className="font-medium text-gray-900 text-sm">Vendor Response:</h4>
+                    <p className="mt-1 text-gray-700">{review.vendorResponse.text}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {formatDate(review.vendorResponse.createdAt)}
+                      {review.vendorResponse.updatedAt && review.vendorResponse.updatedAt !== review.vendorResponse.createdAt && 
+                        ` (Edited: ${formatDate(review.vendorResponse.updatedAt)})`}
+                    </p>
+                  </div>
+                )}
+
                 {/* Like Button */}
                 <div className="mt-4 flex justify-end">
                   <button
