@@ -34,8 +34,8 @@ const UserSchema = new mongoose.Schema(
       trim: true
     },
     avatar: {
-      type: String,
-      default: 'default-avatar.jpg'
+      url: String,
+      publicId: String,
     },
     addresses: [
       {

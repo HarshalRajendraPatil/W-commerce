@@ -60,7 +60,7 @@ const Pagination = ({
   const pages = generatePagination();
 
   return (
-    <nav className="flex justify-center items-center" aria-label="Pagination">
+    <nav className="flex justify-center items-center mt-6" aria-label="Pagination">
       <div className="inline-flex items-center bg-white shadow-sm rounded-lg border border-gray-200">
         {/* Previous button */}
         <button

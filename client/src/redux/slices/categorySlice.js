@@ -22,7 +22,10 @@ export const fetchCategories = createAsyncThunk(
       
       const response = await categoryService.getCategories(params);
 
-      return response.data;
+      return {
+        categories: response.data,
+        pagination: response.pagination || null
+      };
     } catch (error) {
       return rejectWithValue(error.response.data);
     }
@@ -84,7 +87,13 @@ const initialState = {
   isLoading: false,
   error: null,
   success: false,
-  message: ''
+  message: '',
+  pagination: {
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1
+  }
 };
 
 // Create slice
@@ -99,6 +108,9 @@ const categorySlice = createSlice({
     },
     clearCategoryError: (state) => {
       state.error = null;
+    },
+    setPage: (state, action) => {
+      state.pagination.page = action.payload;
     }
   },
   extraReducers: (builder) => {
@@ -109,7 +121,10 @@ const categorySlice = createSlice({
       })
       .addCase(fetchCategories.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.categories = action.payload;
+        state.categories = action.payload.categories;
+        if (action.payload.pagination) {
+          state.pagination = action.payload.pagination;
+        }
         state.error = null;
       })
       .addCase(fetchCategories.rejected, (state, action) => {
@@ -180,5 +195,5 @@ const categorySlice = createSlice({
   }
 });
 
-export const { resetCategoryState, clearCategoryError } = categorySlice.actions;
+export const { resetCategoryState, clearCategoryError, setPage } = categorySlice.actions;
 export default categorySlice.reducer; 

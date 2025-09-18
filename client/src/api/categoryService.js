@@ -5,7 +5,25 @@ const categoryService = {
   getCategories: async (params = {}) => {
     try {
       const response = await axios.get('/categories', { params });
-      return response.data;
+      return {
+        data: response.data.data,
+        pagination: response.data.pagination
+      };
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Get subcategories by parent ID
+  getSubcategories: async (parentId) => {
+    try {
+      const response = await axios.get('/categories', { 
+        params: { 
+          parent: parentId,
+          limit: 100 // Get a large number of subcategories
+        }
+      });
+      return response.data.data;
     } catch (error) {
       throw error;
     }

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../redux/slices/authSlice';
 
 const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -153,7 +154,7 @@ const AdminLayout = () => {
             <div className="flex items-center">
               <span className="text-sm text-gray-700 mr-2">Admin</span>
               <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                A
+                <img src={user?.avatar?.url} alt="Admin" className="w-full h-full rounded-full" />
               </div>
             </div>
           </div>

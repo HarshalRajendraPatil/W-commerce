@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { FiUser, FiEdit2, FiCamera } from 'react-icons/fi';
 import userService from '../../api/userService';
@@ -9,6 +9,8 @@ const ProfileHeader = ({ user, onProfileUpdate }) => {
   const dispatch = useDispatch();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const fileInputRef = useRef(null);
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
     phone: user?.phone || '',
@@ -43,6 +45,53 @@ const ProfileHeader = ({ user, onProfileUpdate }) => {
     }
   };
   
+  const handleAvatarClick = () => {
+    fileInputRef.current.click();
+  };
+  
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      return;
+    }
+    
+    setUploadLoading(true);
+    
+    try {
+      const response = await userService.uploadProfileImage(file);
+      
+      // Update the profile data with the new avatar URL
+      setProfileData({
+        ...profileData,
+        avatar: response.data.avatar
+      });
+      
+      // Call the parent component's callback to update user data
+      if (onProfileUpdate) {
+        onProfileUpdate({
+          ...user,
+          avatar: response.data.avatar
+        });
+      }
+      
+      toast.success('Profile image updated successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to upload profile image');
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+  
   const getRoleBadgeColor = (role) => {
     switch (role) {
       case 'admin':
@@ -60,14 +109,27 @@ const ProfileHeader = ({ user, onProfileUpdate }) => {
     <div className="bg-white shadow-md rounded-lg p-6 mb-6">
       {loading && <Loader />}
       
+      {/* Hidden file input for avatar upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        className="hidden"
+      />
+      
       {isEditing ? (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex items-start space-x-6">
             <div className="relative">
               <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                {profileData.avatar ? (
+                {uploadLoading ? (
+                  <div className="flex items-center justify-center w-full h-full">
+                    <div className="w-6 h-6 border-2 border-t-2 border-gray-500 border-t-blue-500 rounded-full animate-spin"></div>
+                  </div>
+                ) : profileData.avatar.url ? (
                   <img
-                    src={profileData.avatar.startsWith('http') ? profileData.avatar : `/uploads/avatars/${profileData.avatar}`}
+                    src={profileData.avatar.url}
                     alt={profileData.name}
                     className="h-full w-full object-cover"
                   />
@@ -77,8 +139,10 @@ const ProfileHeader = ({ user, onProfileUpdate }) => {
               </div>
               <button
                 type="button"
+                onClick={handleAvatarClick}
                 className="absolute bottom-0 right-0 bg-indigo-600 text-white p-1 rounded-full"
                 title="Upload avatar"
+                disabled={uploadLoading}
               >
                 <FiCamera className="h-4 w-4" />
               </button>
@@ -134,26 +198,40 @@ const ProfileHeader = ({ user, onProfileUpdate }) => {
         </form>
       ) : (
         <div className="flex items-start space-x-6">
-          <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-            {user.avatar ? (
-              <img
-                src={user.avatar.startsWith('http') ? user.avatar : `/uploads/avatars/${user.avatar}`}
-                alt={user.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <FiUser className="h-12 w-12 text-gray-400" />
-            )}
+          <div className="relative">
+            <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+              {uploadLoading ? (
+                <div className="flex items-center justify-center w-full h-full">
+                  <div className="w-6 h-6 border-2 border-t-2 border-gray-500 border-t-blue-500 rounded-full animate-spin"></div>
+                </div>
+              ) : user?.avatar?.url ? (
+                <img
+                  src={user?.avatar?.url}
+                  alt={user?.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <FiUser className="h-12 w-12 text-gray-400" />
+              )}
+            </div>
+            <button
+              onClick={handleAvatarClick}
+              className="absolute bottom-0 right-0 bg-indigo-600 text-white p-1 rounded-full"
+              title="Upload avatar"
+              disabled={uploadLoading}
+            >
+              <FiCamera className="h-4 w-4" />
+            </button>
           </div>
           
           <div className="flex-1">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>
+                <h2 className="text-2xl font-bold text-gray-900">{user?.name}</h2>
                 <div className="flex items-center mt-1">
-                  <span className="text-sm text-gray-500 mr-3">{user.email}</span>
+                  <span className="text-sm text-gray-500 mr-3">{user?.email}</span>
                   <span className={`text-xs px-2 py-1 rounded-full capitalize ${getRoleBadgeColor(user.role)}`}>
-                    {user.role}
+                    {user?.role}
                   </span>
                 </div>
               </div>
@@ -168,13 +246,13 @@ const ProfileHeader = ({ user, onProfileUpdate }) => {
             </div>
             
             <div className="mt-2">
-              {user.phone && (
+              {user?.phone && (
                 <p className="text-sm text-gray-500">
-                  <span className="font-medium">Phone:</span> {user.phone}
+                  <span className="font-medium">Phone:</span> {user?.phone}
                 </p>
               )}
               <p className="text-sm text-gray-500">
-                <span className="font-medium">Member since:</span> {new Date(user.createdAt).toLocaleDateString()}
+                <span className="font-medium">Member since:</span> {new Date(user?.createdAt).toLocaleDateString()}
               </p>
             </div>
           </div>

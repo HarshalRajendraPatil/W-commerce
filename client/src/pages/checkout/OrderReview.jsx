@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import { createOrder, prepareOrder, createRazorpayOrder, processPayment } from '../../redux/slices/orderSlice';
 import { clearCart } from '../../redux/slices/cartSlice';
+import userService from '../../api/userService';
 
 const OrderReview = ({ checkoutData, onBack }) => {
   const navigate = useNavigate();
@@ -55,6 +56,37 @@ const OrderReview = ({ checkoutData, onBack }) => {
     setIsProcessing(true);
     
     try {
+      // Save address if the user opted to save it
+      if (checkoutData.saveInfo) {
+        try {
+          // Check if this address already exists
+          const addressExists = user?.addresses?.some(addr => 
+            addr.street === checkoutData.shippingAddress.street &&
+            addr.city === checkoutData.shippingAddress.city &&
+            addr.state === checkoutData.shippingAddress.state &&
+            addr.zipCode === checkoutData.shippingAddress.zipCode &&
+            addr.country === checkoutData.shippingAddress.country
+          );
+          
+          // Only save if it's a new address
+          if (!addressExists) {
+            const addressData = {
+              street: checkoutData.shippingAddress.street,
+              city: checkoutData.shippingAddress.city,
+              state: checkoutData.shippingAddress.state,
+              zipCode: checkoutData.shippingAddress.zipCode,
+              country: checkoutData.shippingAddress.country,
+              isDefault: !user?.addresses?.length // Make it default if it's the first address
+            };
+            
+            await userService.updateAddress(addressData);
+          }
+        } catch (error) {
+          console.error("Failed to save address:", error);
+          // Don't block the checkout process if address saving fails
+        }
+      }
+      
       // Calculate values
       const subtotal = cart.totalPrice;
       const taxPrice = subtotal * 0.18; // 18% tax
@@ -193,6 +225,20 @@ const OrderReview = ({ checkoutData, onBack }) => {
             Your payment information is secure. We use encrypted connections to protect your data.
           </p>
         </div>
+        
+        {/* Address Saving Information */}
+        {checkoutData.saveInfo && (
+          <div className="text-sm text-green-600">
+            <p>
+              <span className="inline-block align-middle mr-1">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              Your shipping address will be saved to your account for future orders.
+            </p>
+          </div>
+        )}
         
         {/* Actions */}
         <div className="flex justify-between pt-4">

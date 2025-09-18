@@ -1,8 +1,136 @@
-import { useState } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { FiHome, FiPlus, FiEdit2, FiTrash2, FiCheck } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import userService from '../../api/userService';
 import Loader from '../common/Loader';
+
+// Memoize the AddressForm component to prevent unnecessary re-renders
+const AddressForm = memo(({ 
+  formData, 
+  handleChange, 
+  handleSubmit, 
+  isAdding, 
+  setIsAdding, 
+  setIsEditing 
+}) => (
+  <form onSubmit={handleSubmit} className="space-y-4 mt-4 border rounded-md p-4 bg-gray-50">
+    <h3 className="text-lg font-medium text-gray-900">
+      {isAdding ? 'Add New Address' : 'Edit Address'}
+    </h3>
+    
+    <div>
+      <label htmlFor="street" className="block text-sm font-medium text-gray-700 mb-1">
+        Street Address *
+      </label>
+      <input
+        type="text"
+        id="street"
+        name="street"
+        value={formData.street}
+        onChange={handleChange}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        required
+      />
+    </div>
+    
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+          City *
+        </label>
+        <input
+          type="text"
+          id="city"
+          name="city"
+          value={formData.city}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          required
+        />
+      </div>
+      
+      <div>
+        <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+          State/Province *
+        </label>
+        <input
+          type="text"
+          id="state"
+          name="state"
+          value={formData.state}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          required
+        />
+      </div>
+    </div>
+    
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
+          Country *
+        </label>
+        <input
+          type="text"
+          id="country"
+          name="country"
+          value={formData.country}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          required
+        />
+      </div>
+      
+      <div>
+        <label htmlFor="zipCode" className="block text-sm font-medium text-gray-700 mb-1">
+          Zip/Postal Code *
+        </label>
+        <input
+          type="text"
+          id="zipCode"
+          name="zipCode"
+          value={formData.zipCode}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          required
+        />
+      </div>
+    </div>
+    
+    <div className="flex items-center">
+      <input
+        type="checkbox"
+        id="isDefault"
+        name="isDefault"
+        checked={formData.isDefault}
+        onChange={handleChange}
+        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+      />
+      <label htmlFor="isDefault" className="ml-2 block text-sm text-gray-900">
+        Set as default address
+      </label>
+    </div>
+    
+    <div className="flex justify-end space-x-3">
+      <button
+        type="button"
+        onClick={() => {
+          setIsAdding(false);
+          setIsEditing(false);
+        }}
+        className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
+      >
+        {isAdding ? 'Add Address' : 'Save Changes'}
+      </button>
+    </div>
+  </form>
+));
 
 const AddressManager = ({ addresses = [], onAddressUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -18,7 +146,7 @@ const AddressManager = ({ addresses = [], onAddressUpdate }) => {
     isDefault: false
   });
   
-  const handleAddNewClick = () => {
+  const handleAddNewClick = useCallback(() => {
     setFormData({
       street: '',
       city: '',
@@ -29,9 +157,9 @@ const AddressManager = ({ addresses = [], onAddressUpdate }) => {
     });
     setIsAdding(true);
     setIsEditing(false);
-  };
+  }, []);
   
-  const handleEditClick = (address) => {
+  const handleEditClick = useCallback((address) => {
     setCurrentAddress(address);
     setFormData({
       addressId: address._id,
@@ -44,9 +172,9 @@ const AddressManager = ({ addresses = [], onAddressUpdate }) => {
     });
     setIsEditing(true);
     setIsAdding(false);
-  };
+  }, []);
   
-  const handleDeleteClick = async (addressId) => {
+  const handleDeleteClick = useCallback(async (addressId) => {
     if (!confirm('Are you sure you want to delete this address?')) {
       return;
     }
@@ -66,17 +194,17 @@ const AddressManager = ({ addresses = [], onAddressUpdate }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [onAddressUpdate]);
   
-  const handleChange = (e) => {
+  const handleChange = useCallback((e) => {
     const { name, value, checked, type } = e.target;
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [name]: type === 'checkbox' ? checked : value
-    });
-  };
+    }));
+  }, []);
   
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
     setLoading(true);
     
@@ -95,127 +223,7 @@ const AddressManager = ({ addresses = [], onAddressUpdate }) => {
     } finally {
       setLoading(false);
     }
-  };
-  
-  const AddressForm = () => (
-    <form onSubmit={handleSubmit} className="space-y-4 mt-4 border rounded-md p-4 bg-gray-50">
-      <h3 className="text-lg font-medium text-gray-900">
-        {isAdding ? 'Add New Address' : 'Edit Address'}
-      </h3>
-      
-      <div>
-        <label htmlFor="street" className="block text-sm font-medium text-gray-700 mb-1">
-          Street Address *
-        </label>
-        <input
-          type="text"
-          id="street"
-          name="street"
-          value={formData.street}
-          onChange={handleChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-          required
-        />
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-            City *
-          </label>
-          <input
-            type="text"
-            id="city"
-            name="city"
-            value={formData.city}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
-            State/Province *
-          </label>
-          <input
-            type="text"
-            id="state"
-            name="state"
-            value={formData.state}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          />
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
-            Country *
-          </label>
-          <input
-            type="text"
-            id="country"
-            name="country"
-            value={formData.country}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="zipCode" className="block text-sm font-medium text-gray-700 mb-1">
-            Zip/Postal Code *
-          </label>
-          <input
-            type="text"
-            id="zipCode"
-            name="zipCode"
-            value={formData.zipCode}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            required
-          />
-        </div>
-      </div>
-      
-      <div className="flex items-center">
-        <input
-          type="checkbox"
-          id="isDefault"
-          name="isDefault"
-          checked={formData.isDefault}
-          onChange={handleChange}
-          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-        />
-        <label htmlFor="isDefault" className="ml-2 block text-sm text-gray-900">
-          Set as default address
-        </label>
-      </div>
-      
-      <div className="flex justify-end space-x-3">
-        <button
-          type="button"
-          onClick={() => {
-            setIsAdding(false);
-            setIsEditing(false);
-          }}
-          className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
-        >
-          {isAdding ? 'Add Address' : 'Save Changes'}
-        </button>
-      </div>
-    </form>
-  );
+  }, [formData, isAdding, onAddressUpdate]);
   
   return (
     <div className="bg-white shadow-md rounded-lg p-6 mb-6">
@@ -236,7 +244,14 @@ const AddressManager = ({ addresses = [], onAddressUpdate }) => {
       </div>
       
       {isAdding || isEditing ? (
-        <AddressForm />
+        <AddressForm 
+          formData={formData}
+          handleChange={handleChange}
+          handleSubmit={handleSubmit}
+          isAdding={isAdding}
+          setIsAdding={setIsAdding}
+          setIsEditing={setIsEditing}
+        />
       ) : addresses.length === 0 ? (
         <div className="text-center py-8 bg-gray-50 rounded-md">
           <FiHome className="mx-auto h-12 w-12 text-gray-400" />

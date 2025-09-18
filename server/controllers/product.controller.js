@@ -42,9 +42,13 @@ exports.getProducts = async (req, res, next) => {
           slug: req.query.category.toLowerCase() 
         });
       }
-      
+
       if (category) {
-        matchStage.category = category._id;
+        if (category.parent) {
+          matchStage.subcategory = category._id;
+        } else {
+          matchStage.category = category._id;
+        }
       }
     }
 
@@ -846,7 +850,7 @@ exports.getProductsByCategory = async (req, res, next) => {
     const products = await Product.find({ 
       $or: [
         { category: { $in: categoryIds } },
-        { subcategories: { $in: categoryIds } }
+        { subcategory: { $in: categoryIds } }
       ],
       published: true 
     })
@@ -858,7 +862,7 @@ exports.getProductsByCategory = async (req, res, next) => {
     const total = await Product.countDocuments({ 
       $or: [
         { category: { $in: categoryIds } },
-        { subcategories: { $in: categoryIds } }
+        { subcategory: { $in: categoryIds } }
       ],
       published: true 
     });

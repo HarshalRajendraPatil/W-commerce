@@ -7,6 +7,7 @@ const Wishlist = require('../models/Wishlist');
 const Review = require('../models/Review');
 const VendorApplication = require('../models/VendorApplication');
 const Product = require('../models/Product');
+const { uploadToCloudinary, removeFromCloudinary } = require('../utils/cloudinary');
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -640,6 +641,84 @@ exports.getProfile = async (req, res, next) => {
     });
   } catch (error) {
     console.error('Error fetching profile:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+// @desc    Upload user profile image
+// @route   POST /api/auth/upload-avatar
+// @access  Private
+exports.uploadAvatar = async (req, res, next) => {
+  try {
+    // Check if files exist
+    if (!req.files || !req.files.avatar) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload an image file'
+      });
+    }
+    
+    const file = req.files.avatar;
+    
+    // Validate file type
+    if (!file.mimetype.startsWith('image')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload an image file'
+      });
+    }
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({
+        success: false,
+        message: 'Image size should be less than 5MB'
+      });
+    }
+    
+    // Get user
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Delete previous avatar from Cloudinary if it's not the default
+    if (user.avatar.publicId) {
+      try {
+        // Extract public ID from the URL
+        const publicId = user.avatar.publicId;
+        await removeFromCloudinary(publicId, 'avatars');
+      } catch (error) {
+        console.error('Error removing previous avatar:', error);
+        // Continue even if deletion fails
+      }
+    }
+    
+    // Upload new image to Cloudinary
+    const result = await uploadToCloudinary(file.tempFilePath, 'avatars');
+    
+    // Update user avatar
+    user.avatar = {
+      url: result.secure_url,
+      publicId: result.public_id
+    };
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        avatar: user.avatar
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading profile image:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Server error'

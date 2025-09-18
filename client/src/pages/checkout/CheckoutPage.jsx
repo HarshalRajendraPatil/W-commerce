@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { getCart } from '../../redux/slices/cartSlice';
+import { getProfile } from '../../redux/slices/authSlice';
 import ShippingForm from './ShippingForm';
 import OrderReview from './OrderReview';
 import OrderSummary from './OrderSummary';
@@ -23,18 +24,18 @@ const CheckoutPage = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [checkoutData, setCheckoutData] = useState({
     shippingAddress: {
-      fullName: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : '',
-      street: user?.address?.street || '',
-      city: user?.address?.city || '',
-      state: user?.address?.state || '',
-      zipCode: user?.address?.zipCode || '',
-      country: user?.address?.country || '',
+      fullName: user?.name || '',
+      street: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: '',
       phone: user?.phone || ''
     },
     saveInfo: true
   });
 
-  // Fetch cart on page load
+  // Fetch cart and user profile on page load
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login', { state: { from: '/checkout' } });
@@ -42,7 +43,22 @@ const CheckoutPage = () => {
     }
     
     dispatch(getCart());
+    dispatch(getProfile());
   }, [dispatch, isAuthenticated, navigate]);
+
+  // Update form when user data is loaded
+  useEffect(() => {
+    if (user) {
+      setCheckoutData(prev => ({
+        ...prev,
+        shippingAddress: {
+          ...prev.shippingAddress,
+          fullName: user.name || '',
+          phone: user.phone || ''
+        }
+      }));
+    }
+  }, [user]);
 
   // Redirect to cart if empty
   useEffect(() => {

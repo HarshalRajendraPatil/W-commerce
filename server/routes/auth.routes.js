@@ -11,7 +11,8 @@ const {
   updateProfile,
   updateAddress,
   deleteAddress,
-  getProfile
+  getProfile,
+  uploadAvatar
 } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 
@@ -34,5 +35,6 @@ router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
 router.put('/address', protect, updateAddress);
 router.delete('/address/:id', protect, deleteAddress);
+router.post('/upload-avatar', protect, uploadAvatar);
 
 module.exports = router; 

@@ -158,7 +158,7 @@ const Home = () => {
         const [featuredProductsRes, topRatedProductsRes, featuredCategoriesRes, newArrivalsRes] = await Promise.all([
           productService.getFeaturedProducts(8),
           productService.getTopRatedProducts(8),
-          categoryService.getFeaturedCategories(6),
+          categoryService.getCategories({ limit: 6 }),
           productService.getProducts({ sort: '-createdAt', limit: 8 })
         ]);
         

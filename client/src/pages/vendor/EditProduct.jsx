@@ -19,6 +19,7 @@ const EditProduct = () => {
     description: '',
     price: '',
     category: '',
+    subcategory: '',
     stockCount: '',
     brand: '',
     discountPercentage: '0',
@@ -43,6 +44,7 @@ const EditProduct = () => {
   
   // Category state
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -66,6 +68,7 @@ const EditProduct = () => {
           description: product.description || '',
           price: product.price || '',
           category: product.category?._id || '',
+          subcategory: product.subcategory?._id || '',
           stockCount: product.stockCount || '',
           brand: product.brand || '',
           discountPercentage: product.discountPercentage || '0',
@@ -79,6 +82,12 @@ const EditProduct = () => {
           published: product.published || false,
           imagesAlt: product.images?.map(img => img.alt || '') || []
         });
+        
+        // Fetch subcategories if category is selected
+        if (product.category?._id) {
+          const subcategoriesData = await categoryService.getSubcategories(product.category._id);
+          setSubcategories(subcategoriesData);
+        }
         
         // Set existing images
         if (product.images && product.images.length > 0) {
@@ -102,6 +111,39 @@ const EditProduct = () => {
     
     fetchData();
   }, [productId]);
+  
+  // Load subcategories when category changes
+  useEffect(() => {
+    const fetchSubcategories = async () => {
+      if (!formData.category) {
+        setSubcategories([]);
+        return;
+      }
+      
+      try {
+        const data = await categoryService.getSubcategories(formData.category);
+        setSubcategories(data);
+        
+        // Reset subcategory selection when category changes
+        // Only reset if we're changing category, not on initial load
+        if (formData.subcategory) {
+          // Check if current subcategory belongs to the new category
+          const subcategoryExists = data.some(sub => sub._id === formData.subcategory);
+          if (!subcategoryExists) {
+            setFormData(prev => ({
+              ...prev,
+              subcategory: ''
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching subcategories:', err);
+        setError('Failed to load subcategories. Please try again later.');
+      }
+    };
+    
+    fetchSubcategories();
+  }, [formData.category]);
   
   // Handle input changes
   const handleChange = (e) => {
@@ -335,6 +377,29 @@ const EditProduct = () => {
                   </option>
                 ))}
               </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Subcategory
+              </label>
+              <select
+                name="subcategory"
+                value={formData.subcategory}
+                onChange={handleChange}
+                disabled={!formData.category || subcategories.length === 0}
+                className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+              >
+                <option value="">Select Subcategory</option>
+                {subcategories.map((subcategory) => (
+                  <option key={subcategory._id} value={subcategory._id}>
+                    {subcategory.name}
+                  </option>
+                ))}
+              </select>
+              {formData.category && subcategories.length === 0 && (
+                <p className="mt-1 text-sm text-gray-500">No subcategories available</p>
+              )}
             </div>
             
             <div>

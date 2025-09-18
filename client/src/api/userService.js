@@ -76,6 +76,20 @@ const updateProfile = async (profileData) => {
   return response.data;
 };
 
+// Upload profile image
+const uploadProfileImage = async (imageFile) => {
+  const formData = new FormData();
+  formData.append('avatar', imageFile);
+  
+  const response = await axios.post('/auth/upload-avatar', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+  
+  return response.data;
+};
+
 // Add/update address
 const updateAddress = async (addressData) => {
   const response = await axios.put('/auth/address', addressData);
@@ -157,6 +171,7 @@ const deleteProduct = async (productId) => {
 const userService = {
   getProfile,
   updateProfile,
+  uploadProfileImage,
   updateAddress,
   deleteAddress,
   getMyOrders,

@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchCategories, deleteCategory } from '../../redux/slices/categorySlice';
+import { fetchCategories, deleteCategory, setPage } from '../../redux/slices/categorySlice';
 import { toast } from 'react-toastify';
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiX, FiEye, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import CategoryForm from '../../components/admin/CategoryForm';
 import CategoryStats from '../../components/admin/CategoryStats';
 import Modal from '../../components/Modal';
+import Pagination from '../../components/common/Pagination';
 import { Link } from 'react-router-dom';
 
 const Categories = () => {
   const dispatch = useDispatch();
-  const { categories, isLoading, error, success, message } = useSelector((state) => state.category);
+  const { categories, isLoading, error, success, message, pagination } = useSelector((state) => state.category);
   const [deleteLoading, setDeleteLoading] = useState(false);
   
   // CRUD modals
@@ -39,7 +40,7 @@ const Categories = () => {
 
   useEffect(() => {
     loadCategories();
-  }, [dispatch]);
+  }, [dispatch, pagination.page]);
 
   useEffect(() => {
     if (success && message) {
@@ -58,80 +59,45 @@ const Categories = () => {
   const loadCategories = async () => {
     try {
       // Request includes product counts for each category
-      await dispatch(fetchCategories({ includeStats: true })).unwrap();
+      await dispatch(fetchCategories({ 
+        includeStats: true,
+        page: pagination.page,
+        limit: pagination.limit,
+        search: searchTerm,
+        parent: parentFilter === 'top' ? 'null' : (parentFilter === 'sub' ? 'exists' : ''),
+        isActive: activeFilter !== '' ? (activeFilter === 'active' ? 'true' : 'false') : '',
+        featured: featuredFilter !== '' ? (featuredFilter === 'featured' ? 'true' : 'false') : '',
+        sort: sortOption
+      })).unwrap();
     } catch (err) {
       toast.error('Failed to load categories');
     }
   };
   
   const filterCategories = () => {
-    let filtered = [...categories];
-    
-    // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(cat => 
-        cat.name.toLowerCase().includes(searchLower) ||
-        cat.description?.toLowerCase().includes(searchLower) ||
-        cat.slug.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    // Apply parent filter
-    if (parentFilter === 'top') {
-      filtered = filtered.filter(cat => !cat.parent);
-    } else if (parentFilter === 'sub') {
-      filtered = filtered.filter(cat => cat.parent);
-    }
-    
-    // Apply active filter
-    if (activeFilter !== '') {
-      const isActive = activeFilter === 'active';
-      filtered = filtered.filter(cat => cat.isActive === isActive);
-    }
-    
-    // Apply featured filter
-    if (featuredFilter !== '') {
-      const isFeatured = featuredFilter === 'featured';
-      filtered = filtered.filter(cat => cat.featured === isFeatured);
-    }
-    
-    // Apply sorting
-    if (sortOption === 'name') {
-      filtered.sort((a, b) => a.name.localeCompare(b.name));
-    } else if (sortOption === '-name') {
-      filtered.sort((a, b) => b.name.localeCompare(a.name));
-    } else if (sortOption === 'order') {
-      filtered.sort((a, b) => a.order - b.order);
-    } else if (sortOption === '-order') {
-      filtered.sort((a, b) => b.order - a.order);
-    } else if (sortOption === 'products') {
-      filtered.sort((a, b) => (b.productCount || 0) - (a.productCount || 0));
-    }
+    // No longer need client-side filtering since we're using server-side filtering and pagination
+    setFilteredCategories(categories);
     
     // Update the stats
     setCategoryStats({
-      total: categories.length,
+      total: pagination.total || 0,
       topLevel: categories.filter(cat => !cat.parent).length,
       subcategories: categories.filter(cat => cat.parent).length,
       featured: categories.filter(cat => cat.featured).length,
       inactive: categories.filter(cat => !cat.isActive).length
     });
-    
-    setFilteredCategories(filtered);
   };
 
   const handleDelete = async (id) => {
-
-      setDeleteLoading(true);
-      try {
-        await dispatch(deleteCategory(id)).unwrap();
-      } catch (err) {
-        toast.error(err.message || 'Failed to delete category');
-      } finally {
-        setDeleteLoading(false);
-      }
-
+    setDeleteLoading(true);
+    try {
+      await dispatch(deleteCategory(id)).unwrap();
+      loadCategories(); // Reload categories after deletion
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete category');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
   
   const handleEdit = (category) => {
@@ -157,6 +123,23 @@ const Categories = () => {
     setActiveFilter('');
     setFeaturedFilter('');
     setSortOption('order');
+    dispatch(setPage(1)); // Reset to first page when filters change
+    loadCategories();
+  };
+  
+  const handlePageChange = (page) => {
+    dispatch(setPage(page));
+  };
+  
+  const handleSearch = (e) => {
+    e.preventDefault();
+    dispatch(setPage(1)); // Reset to first page when search changes
+    loadCategories();
+  };
+  
+  const handleFilterChange = () => {
+    dispatch(setPage(1)); // Reset to first page when filters change
+    loadCategories();
   };
 
   return (
@@ -201,7 +184,7 @@ const Categories = () => {
       
       {/* Search and Filters */}
       <div className="bg-white p-4 rounded-md shadow">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
+        <form onSubmit={handleSearch} className="flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
           <div className="w-full md:w-1/3 relative">
             <input
               type="text"
@@ -212,8 +195,13 @@ const Categories = () => {
             />
             {searchTerm && (
               <button 
+                type="button"
                 className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
-                onClick={() => setSearchTerm('')}
+                onClick={() => {
+                  setSearchTerm('');
+                  dispatch(setPage(1));
+                  loadCategories();
+                }}
               >
                 <FiX className="h-5 w-5" />
               </button>
@@ -222,6 +210,7 @@ const Categories = () => {
           
           <div className="flex space-x-2">
             <button
+              type="button"
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
@@ -231,7 +220,10 @@ const Categories = () => {
             
             <select
               value={sortOption}
-              onChange={(e) => setSortOption(e.target.value)}
+              onChange={(e) => {
+                setSortOption(e.target.value);
+                handleFilterChange();
+              }}
               className="border border-gray-300 rounded-md px-3 py-2 text-sm"
             >
               <option value="order">Order (Low to High)</option>
@@ -240,8 +232,15 @@ const Categories = () => {
               <option value="-name">Name (Z to A)</option>
               <option value="products">Products (Most to Least)</option>
             </select>
+            
+            <button
+              type="submit"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Search
+            </button>
           </div>
-        </div>
+        </form>
         
         {showFilters && (
           <div className="bg-gray-50 p-4 rounded-md mt-2">
@@ -250,7 +249,10 @@ const Categories = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                 <select
                   value={parentFilter}
-                  onChange={(e) => setParentFilter(e.target.value)}
+                  onChange={(e) => {
+                    setParentFilter(e.target.value);
+                    handleFilterChange();
+                  }}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                 >
                   <option value="">All Categories</option>
@@ -263,7 +265,10 @@ const Categories = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   value={activeFilter}
-                  onChange={(e) => setActiveFilter(e.target.value)}
+                  onChange={(e) => {
+                    setActiveFilter(e.target.value);
+                    handleFilterChange();
+                  }}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                 >
                   <option value="">All</option>
@@ -276,7 +281,10 @@ const Categories = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Featured</label>
                 <select
                   value={featuredFilter}
-                  onChange={(e) => setFeaturedFilter(e.target.value)}
+                  onChange={(e) => {
+                    setFeaturedFilter(e.target.value);
+                    handleFilterChange();
+                  }}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
                 >
                   <option value="">All</option>
@@ -287,6 +295,7 @@ const Categories = () => {
               
               <div className="md:col-span-3 flex justify-end">
                 <button
+                  type="button"
                   onClick={resetFilters}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
@@ -427,6 +436,23 @@ const Categories = () => {
               )}
             </tbody>
           </table>
+          
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-200">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-700">
+                  Showing <span className="font-medium">{filteredCategories.length}</span> of{' '}
+                  <span className="font-medium">{pagination.total}</span> categories
+                </p>
+                <Pagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
       

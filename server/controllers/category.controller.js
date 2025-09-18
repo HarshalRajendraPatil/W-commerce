@@ -20,7 +20,13 @@ exports.getCategories = async (req, res, next) => {
     
     // Filter by parent if specified
     if (req.query.parent) {
-      query.parent = req.query.parent === 'null' ? null : req.query.parent;
+      if (req.query.parent === 'null') {
+        query.parent = null;
+      } else if (req.query.parent === 'exists') {
+        query.parent = { $ne: null };
+      } else {
+        query.parent = req.query.parent;
+      }
     }
     
     // Filter by featured if specified
@@ -38,9 +44,19 @@ exports.getCategories = async (req, res, next) => {
       query.name = { $regex: req.query.search, $options: 'i' };
     }
     
-    // Execute query with sorting by order
+    // Pagination
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+    
+    // Count total documents for pagination
+    const total = await Category.countDocuments(query);
+    
+    // Execute query with sorting by order and pagination
     const categories = await Category.find(query)
       .sort(req.query.sort || 'order name')
+      .skip(skip)
+      .limit(limit)
       .populate({
         path: 'parent',
         select: 'name slug'
@@ -54,7 +70,7 @@ exports.getCategories = async (req, res, next) => {
     if (req.query.includeStats === 'true') {
       const categoriesWithStats = await Promise.all(
         categories.map(async (category) => {
-          const productCount = await Product.countDocuments({ category: category._id });
+          const productCount = category.parent ? await Product.countDocuments({ subcategory: category._id }) : await Product.countDocuments({ category: category._id });
           const categoryObj = category.toObject();
           categoryObj.productCount = productCount;
           return categoryObj;
@@ -64,14 +80,26 @@ exports.getCategories = async (req, res, next) => {
       return res.status(200).json({
         success: true,
         count: categoriesWithStats.length,
-        data: categoriesWithStats
+        data: categoriesWithStats,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
       });
     }
     
     res.status(200).json({
       success: true,
       count: categories.length,
-      data: categories
+      data: categories,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
     });
   } catch (err) {
     next(err);

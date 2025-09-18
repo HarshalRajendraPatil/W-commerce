@@ -15,6 +15,7 @@ const AddProduct = () => {
     description: '',
     price: '',
     category: '',
+    subcategory: '',
     stockCount: '',
     brand: '',
     discountPercentage: '0',
@@ -37,6 +38,7 @@ const AddProduct = () => {
   
   // Category state
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -54,6 +56,32 @@ const AddProduct = () => {
     
     fetchCategories();
   }, []);
+
+  // Load subcategories when category changes
+  useEffect(() => {
+    const fetchSubcategories = async () => {
+      if (!formData.category) {
+        setSubcategories([]);
+        return;
+      }
+      
+      try {
+        const data = await categoryService.getSubcategories(formData.category);
+        setSubcategories(data);
+        
+        // Reset subcategory selection when category changes
+        setFormData(prev => ({
+          ...prev,
+          subcategory: ''
+        }));
+      } catch (err) {
+        console.error('Error fetching subcategories:', err);
+        setError('Failed to load subcategories. Please try again later.');
+      }
+    };
+    
+    fetchSubcategories();
+  }, [formData.category]);
   
   // Handle input changes
   const handleChange = (e) => {
@@ -241,6 +269,29 @@ const AddProduct = () => {
                   </option>
                 ))}
               </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Subcategory
+              </label>
+              <select
+                name="subcategory"
+                value={formData.subcategory}
+                onChange={handleChange}
+                disabled={!formData.category || subcategories.length === 0}
+                className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
+              >
+                <option value="">Select Subcategory</option>
+                {subcategories.map((subcategory) => (
+                  <option key={subcategory._id} value={subcategory._id}>
+                    {subcategory.name}
+                  </option>
+                ))}
+              </select>
+              {formData.category && subcategories.length === 0 && (
+                <p className="mt-1 text-sm text-gray-500">No subcategories available</p>
+              )}
             </div>
             
             <div>
